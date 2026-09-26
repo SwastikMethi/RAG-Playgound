@@ -1,8 +1,9 @@
-import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
+import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  root: 'apps/web', plugins: [react()],
-  server: { proxy: { '/api': 'http://127.0.0.1:8780' } },
-  test: { include: ['src/**/*.test.ts'] },
+  root: "apps/web",
+  plugins: [react()],
+  server: { proxy: { "/api": "http://127.0.0.1:8780" } },
+  test: { include: ["src/**/*.test.ts"] },
 });

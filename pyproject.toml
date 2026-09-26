@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "An inspectable, self-hosted retrieval comparison workspace"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+  "psutil>=7,<8",
   "fastapi>=0.115,<1", "uvicorn>=0.34,<1", "pydantic-settings>=2.8,<3",
   "sqlalchemy>=2.0,<3", "alembic>=1.15,<2", "psycopg[binary,pool]>=3.2,<4",
   "python-multipart>=0.0.20,<1", "jsonschema>=4.23,<5", "PyYAML>=6,<7",

@@ -13,5 +13,10 @@ class Problem(Exception):
         return self.message
 
     def public(self, request_id=None):
-        return dict(code=self.code, message=self.message, retryable=self.retryable,
-                    details=self.details, request_id=request_id)
+        return dict(
+            code=self.code,
+            message=self.message,
+            retryable=self.retryable,
+            details=self.details,
+            request_id=request_id,
+        )

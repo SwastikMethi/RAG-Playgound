@@ -52,7 +52,11 @@ class Store:
                 query = query.where(Job.id == job_id)
             if kinds:
                 query = query.where(Job.kind.in_(kinds))
-            active = s.scalar(select(func.count()).select_from(Job).where(Job.kind == "compare_run", Job.status == "running"))
+            active = s.scalar(
+                select(func.count())
+                .select_from(Job)
+                .where(Job.kind == "compare_run", Job.status == "running")
+            )
             if active >= compare_limit:
                 query = query.where(Job.kind != "compare_run")
             job = s.scalar(query.order_by(Job.created_at, Job.id).with_for_update(skip_locked=True).limit(1))
@@ -66,7 +70,12 @@ class Store:
 
     def owned(self, session, job_id, token):
         job = session.scalar(select(Job).where(Job.id == job_id).with_for_update())
-        if not job or job.status != "running" or job.owner_token != token or job.lease_expires_at <= self.now(session):
+        if (
+            not job
+            or job.status != "running"
+            or job.owner_token != token
+            or job.lease_expires_at <= self.now(session)
+        ):
             raise Problem("WORKER_LOST", "The worker no longer owns this lease.", 409)
         return job
 
@@ -80,8 +89,11 @@ class Store:
     def path(self, artifact):
         raw = self.root / artifact.relative_storage_key
         path = raw.resolve()
-        if (not path.is_relative_to(self.root) or raw.is_symlink()
-                or any(p.is_symlink() for p in raw.parents if p.is_relative_to(self.root))):
+        if (
+            not path.is_relative_to(self.root)
+            or raw.is_symlink()
+            or any(p.is_symlink() for p in raw.parents if p.is_relative_to(self.root))
+        ):
             raise Problem("INTERNAL_ERROR", "Invalid artifact location.", 500)
         return path
 
@@ -99,9 +111,15 @@ class Store:
             file.flush()
             os.fsync(file.fileno())
         os.replace(temporary, target)
-        artifact = Artifact(id=artifact_id, project_id=project_id, kind=kind,
-                            content_sha256=digest(content), relative_storage_key=relative,
-                            byte_count=len(content), manifest=manifest or {})
+        artifact = Artifact(
+            id=artifact_id,
+            project_id=project_id,
+            kind=kind,
+            content_sha256=digest(content),
+            relative_storage_key=relative,
+            byte_count=len(content),
+            manifest=manifest or {},
+        )
         session.add(artifact)
         session.flush()
         return artifact

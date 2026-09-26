@@ -1,4 +1,5 @@
 """Canonical text with physical page / record boundaries and code-point offsets."""
+
 import hashlib
 import json
 import sys
@@ -26,6 +27,7 @@ def parse_file(path: Path, kind: str) -> dict:
         parser, revision = "utf8", "1"
     elif kind == "pdf":
         from pypdf import PdfReader
+
         try:
             pdf = PdfReader(path, strict=True)
             if pdf.is_encrypted:
@@ -37,7 +39,9 @@ def parse_file(path: Path, kind: str) -> dict:
                 raise Problem("SCANNED_PDF", "This PDF has no text layer. OCR is not enabled.")
             for page, extracted in zip(pdf.pages, page_text):
                 if not extracted.strip() and len(page.images):
-                    raise Problem("SCANNED_PDF", "A page contains images without a text layer. OCR is not enabled.")
+                    raise Problem(
+                        "SCANNED_PDF", "A page contains images without a text layer. OCR is not enabled."
+                    )
         except Problem:
             raise
         except Exception:
@@ -45,19 +49,30 @@ def parse_file(path: Path, kind: str) -> dict:
         from docling.datamodel.base_models import InputFormat
         from docling.datamodel.pipeline_options import PdfPipelineOptions
         from docling.document_converter import DocumentConverter, PdfFormatOption
-        options = PdfPipelineOptions(do_ocr=False, do_table_structure=True, document_timeout=110,
-                                     enable_remote_services=False, allow_external_plugins=False)
+
+        options = PdfPipelineOptions(
+            do_ocr=False,
+            do_table_structure=True,
+            document_timeout=110,
+            enable_remote_services=False,
+            allow_external_plugins=False,
+        )
         try:
-            result = DocumentConverter(format_options={InputFormat.PDF: PdfFormatOption(
-                pipeline_options=options)}).convert(path, max_num_pages=500, max_file_size=MAX_FILE)
+            result = DocumentConverter(
+                format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=options)}
+            ).convert(path, max_num_pages=500, max_file_size=MAX_FILE)
             if result.status.value != "success":
                 raise Problem("PDF_PARSE_FAILED", "PDF conversion did not finish successfully.")
-            pages = [result.document.export_to_markdown(page_no=i, image_placeholder="", escape_html=False)
-                     for i in range(1, len(page_text) + 1)]
+            pages = [
+                result.document.export_to_markdown(page_no=i, image_placeholder="", escape_html=False)
+                for i in range(1, len(page_text) + 1)
+            ]
         except Problem:
             raise
         except Exception:
-            raise Problem("PDF_PARSE_FAILED", "PDF parsing failed. Check the installed Docling model assets.") from None
+            raise Problem(
+                "PDF_PARSE_FAILED", "PDF parsing failed. Check the installed Docling model assets."
+            ) from None
         text, segments = "", []
         for i, page in enumerate(pages, 1):
             start = len(text)
@@ -71,8 +86,14 @@ def parse_file(path: Path, kind: str) -> dict:
         raise Problem("EMPTY_SOURCE", "The source contains no readable text.")
     if len(text) > MAX_CHARS:
         raise Problem("SOURCE_TOO_LARGE", "A source must contain at most two million characters.")
-    return dict(text=text, segments=segments, sha256=hashlib.sha256(raw).hexdigest(), format=kind,
-                parser=parser, parser_revision=revision)
+    return dict(
+        text=text,
+        segments=segments,
+        sha256=hashlib.sha256(raw).hexdigest(),
+        format=kind,
+        parser=parser,
+        parser_revision=revision,
+    )
 
 
 if __name__ == "__main__":

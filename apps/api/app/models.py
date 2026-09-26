@@ -1,4 +1,5 @@
 """Metadata and durable execution; migrations exclusively own table creation."""
+
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -66,7 +67,9 @@ class Corpus(Identity, Base):
 
 class CorpusSource(Base):
     __tablename__ = "corpus_sources"
-    corpus_version_id: Mapped[str] = mapped_column(ForeignKey("corpus_versions.id", ondelete="CASCADE"), primary_key=True)
+    corpus_version_id: Mapped[str] = mapped_column(
+        ForeignKey("corpus_versions.id", ondelete="CASCADE"), primary_key=True
+    )
     source_id: Mapped[str] = mapped_column(ForeignKey("sources.id"), primary_key=True)
     ordinal: Mapped[int] = mapped_column(Integer)
 

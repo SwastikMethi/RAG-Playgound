@@ -1,4 +1,5 @@
 """Validation reads the authoritative contracts, including external references."""
+
 import hashlib
 import json
 from functools import lru_cache
@@ -32,9 +33,16 @@ def schema_file(name):
 @lru_cache
 def validator(name, component=None):
     registry = Registry()
-    for filename in ("pipeline.schema.json", "trace-event.schema.json", "export-manifest.schema.json", "openapi.yaml"):
-        registry = registry.with_resource((CONTRACT_ROOT / filename).as_uri(),
-                   Resource.from_contents(schema_file(filename), default_specification=DRAFT202012))
+    for filename in (
+        "pipeline.schema.json",
+        "trace-event.schema.json",
+        "export-manifest.schema.json",
+        "openapi.yaml",
+    ):
+        registry = registry.with_resource(
+            (CONTRACT_ROOT / filename).as_uri(),
+            Resource.from_contents(schema_file(filename), default_specification=DRAFT202012),
+        )
     target = (CONTRACT_ROOT / name).as_uri()
     if component:
         target += "#/components/schemas/" + component
@@ -45,8 +53,11 @@ def validate(value, name="pipeline.schema.json", component=None):
     error = next(validator(name, component).iter_errors(value), None)
     if error:
         # Do not include the rejected value: it can contain credentials or private text.
-        raise Problem("VALIDATION_ERROR", "The request does not match its contract.",
-                      details={"field": ".".join(map(str, error.absolute_path)), "rule": error.validator})
+        raise Problem(
+            "VALIDATION_ERROR",
+            "The request does not match its contract.",
+            details={"field": ".".join(map(str, error.absolute_path)), "rule": error.validator},
+        )
     if name == "pipeline.schema.json":
         cfg = value
         if cfg["search"]["context_k"] > cfg["search"]["candidate_k"]:

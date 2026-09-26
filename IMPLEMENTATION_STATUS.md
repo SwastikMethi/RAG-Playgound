@@ -5,8 +5,8 @@ Implementation is in progress on `codex/implement-rag-playground`. The approved 
 | Milestone | State | Evidence |
 | --- | --- | --- |
 | M0 foundations | Verified foundation | 44 API contracts; four foundation/auth/revision tests; frontend production build |
-| M1 BM25 slice | In progress | Six real parsing/chunking/retrieval tests pass, including Docling PDF pages; complete journey pending |
-| M2 dense/hybrid/rerank | Pending | |
+| M1 BM25 slice | Verified functional slice | 12 Python checks, reducer check, production build and browser upload → prepare → answer → citation → replay journey pass |
+| M2 dense/hybrid/rerank | In progress | Implementing scoped Qdrant and actual local reranking next |
 | M3 traces/recovery | Pending | |
 | M4 hierarchy/PageIndex | Pending | |
 | M5 PostgreSQL source | Pending | |
@@ -34,3 +34,7 @@ Full application checks, rendered UI evidence, actual reranker weights, and Page
 - `.venv/bin/python -m pytest tests/unit/test_contracts.py tests/integration/test_foundations.py tests/integration/test_api.py -q`: 4 passed, using dedicated PostgreSQL test database.
 - `.venv/bin/python -m pytest tests/unit/test_runtime.py -q`: 6 passed, real BM25, tokenization and Docling PDF conversion. Model asset initialization took roughly two minutes.
 - `npm run generate:types` and `npm run build`: passed. Host Node 25 was used; supported Node 22 container validation remains pending.
+- M1 `.venv/bin/python -m pytest tests/unit tests/integration -q`: 12 passed. The evidence-list response was subsequently corrected to the authoritative contract and its journey test passed again.
+- M1 `npm test`: one reducer check passed for Unicode offsets, duplicate frames, sequence gaps and replay reconstruction.
+- M1 `npm run test:e2e`: one complete browser journey passed against the real API/worker/PostgreSQL, with an explicitly synthetic model provider.
+- Inspected `test-results/bm25-desktop.png` (1440px) and `test-results/bm25-mobile.png` (390px). Source and answer text are readable and there is no mobile horizontal overflow. This is provisional visual evidence: vertical density, mobile workspace controls, complete workflows, 1024px, keyboard and reduced-motion gates remain for M7/M8.
