@@ -1,0 +1,22 @@
+{
+  "status": "passed",
+  "scope": "Implementation documentation, contracts and synthetic fixtures only; no application is implemented or benchmarked.",
+  "schema_engine": "built_in_pack_schema_subset",
+  "standard_openapi_validation": "not_run_dependency_unavailable",
+  "implementation_documents": 16,
+  "pipeline_examples": 6,
+  "trace_events": 45,
+  "api_operations": 40,
+  "checks": [
+    "Required implementation documents exist",
+    "Markdown local links resolve",
+    "Included Python validator parses",
+    "Schema keyword shapes and local references are consistent",
+    "Six configurations satisfy schemas and cross-field limits",
+    "Invalid technique fields, unknown properties and call caps are rejected",
+    "OpenAPI operations, parameters, authorization and references are internally consistent",
+    "Synthetic source hashes and question references match files",
+    "45 synthetic trace events satisfy shapes, lifecycle, timings, sources, citations and answer hashes",
+    "Export example preserves configuration hash and makes no verification claims"
+  ]
+}

@@ -1,0 +1,1808 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "lane_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "emitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "elapsed_ms": {
+      "type": "number",
+      "minimum": 0
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "run.started",
+        "lane.started",
+        "stage.started",
+        "stage.completed",
+        "stage.failed",
+        "stage.skipped",
+        "retrieval.candidates",
+        "rerank.completed",
+        "tree.nodes_selected",
+        "context.selected",
+        "answer.delta",
+        "answer.completed",
+        "usage.recorded",
+        "warning",
+        "lane.completed",
+        "lane.failed",
+        "lane.cancelled",
+        "lane.timed_out",
+        "run.completed",
+        "run.partial",
+        "run.failed",
+        "run.cancelled"
+      ]
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "event_id",
+    "run_id",
+    "lane_id",
+    "seq",
+    "emitted_at",
+    "elapsed_ms",
+    "type",
+    "payload"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RAG Playground trace event",
+  "$defs": {
+    "Error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "details": {
+          "type": "object"
+        },
+        "request_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "retryable",
+        "details",
+        "request_id"
+      ],
+      "additionalProperties": false
+    },
+    "Evidence": {
+      "type": "object",
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "source_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "excerpt": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 50000
+        },
+        "location": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "pdf",
+                "text",
+                "database"
+              ]
+            },
+            "page_start": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "page_end": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "char_start": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "char_end": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "line_start": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "line_end": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "relation": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "record_key": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean",
+                      "null"
+                    ]
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "page_start",
+            "page_end",
+            "char_start",
+            "char_end",
+            "line_start",
+            "line_end",
+            "relation",
+            "record_key"
+          ],
+          "additionalProperties": false
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^E[1-9][0-9]*$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "score_type": {
+          "type": "string",
+          "enum": [
+            "bm25",
+            "cosine",
+            "rrf",
+            "reranker",
+            "none"
+          ]
+        },
+        "rank": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "branch_ranks": {
+          "type": "object",
+          "properties": {
+            "lexical": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dense": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "lexical",
+            "dense"
+          ],
+          "additionalProperties": false
+        },
+        "included_in_context": {
+          "type": "boolean"
+        },
+        "span_truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "candidate_id",
+        "source_id",
+        "source_name",
+        "excerpt",
+        "location",
+        "label",
+        "score",
+        "score_type",
+        "rank",
+        "branch_ranks",
+        "included_in_context",
+        "span_truncated"
+      ],
+      "additionalProperties": false
+    },
+    "Timing": {
+      "type": "object",
+      "properties": {
+        "retrieval_ms": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "context_ms": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "generation_ms": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ttft_ms": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "total_ms": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider_wait_ms": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "retrieval_ms",
+        "context_ms",
+        "generation_ms",
+        "ttft_ms",
+        "total_ms",
+        "provider_wait_ms"
+      ],
+      "additionalProperties": false
+    },
+    "Usage": {
+      "type": "object",
+      "properties": {
+        "input_tokens": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "output_tokens": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "embedding_tokens": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "estimated_cost_usd": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "accounting": {
+          "type": "string",
+          "enum": [
+            "reported",
+            "estimated",
+            "partial",
+            "unavailable"
+          ]
+        },
+        "price_revision": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "input_tokens",
+        "output_tokens",
+        "embedding_tokens",
+        "estimated_cost_usd",
+        "accounting",
+        "price_revision"
+      ],
+      "additionalProperties": false
+    },
+    "run_started": {
+      "type": "object",
+      "properties": {
+        "lane_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "minItems": 1,
+          "maxItems": 6
+        },
+        "queue_ms": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "lane_ids",
+        "queue_ms"
+      ],
+      "additionalProperties": false
+    },
+    "lane_started": {
+      "type": "object",
+      "properties": {
+        "technique": {
+          "type": "string",
+          "enum": [
+            "bm25",
+            "dense",
+            "hybrid",
+            "hybrid_rerank",
+            "parent_child",
+            "pageindex"
+          ]
+        },
+        "config_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "bundle_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "technique",
+        "config_id",
+        "bundle_id"
+      ],
+      "additionalProperties": false
+    },
+    "stage_started": {
+      "type": "object",
+      "properties": {
+        "span_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "retrieval",
+            "query_embedding",
+            "lexical_search",
+            "dense_search",
+            "fusion",
+            "rerank",
+            "parent_expansion",
+            "document_selection",
+            "tree_navigation",
+            "context_packing",
+            "generation"
+          ]
+        },
+        "parent_span_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2
+        },
+        "display_label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "span_id",
+        "stage",
+        "parent_span_id",
+        "attempt",
+        "display_label"
+      ],
+      "additionalProperties": false
+    },
+    "stage_completed": {
+      "type": "object",
+      "properties": {
+        "span_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "retrieval",
+            "query_embedding",
+            "lexical_search",
+            "dense_search",
+            "fusion",
+            "rerank",
+            "parent_expansion",
+            "document_selection",
+            "tree_navigation",
+            "context_packing",
+            "generation"
+          ]
+        },
+        "duration_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "resource_wait_ms": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "span_id",
+        "stage",
+        "duration_ms",
+        "resource_wait_ms"
+      ],
+      "additionalProperties": false
+    },
+    "stage_failed": {
+      "type": "object",
+      "properties": {
+        "span_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "retrieval",
+            "query_embedding",
+            "lexical_search",
+            "dense_search",
+            "fusion",
+            "rerank",
+            "parent_expansion",
+            "document_selection",
+            "tree_navigation",
+            "context_packing",
+            "generation"
+          ]
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "$ref": "#/$defs/Error"
+        }
+      },
+      "required": [
+        "span_id",
+        "stage",
+        "duration_ms",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "stage_skipped": {
+      "type": "object",
+      "properties": {
+        "span_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "retrieval",
+            "query_embedding",
+            "lexical_search",
+            "dense_search",
+            "fusion",
+            "rerank",
+            "parent_expansion",
+            "document_selection",
+            "tree_navigation",
+            "context_packing",
+            "generation"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      },
+      "required": [
+        "span_id",
+        "stage",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "retrieval_candidates": {
+      "type": "object",
+      "properties": {
+        "span_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "retrieval",
+            "query_embedding",
+            "lexical_search",
+            "dense_search",
+            "fusion",
+            "rerank",
+            "parent_expansion",
+            "document_selection",
+            "tree_navigation",
+            "context_packing",
+            "generation"
+          ]
+        },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "minItems": 0,
+          "maxItems": 200
+        }
+      },
+      "required": [
+        "span_id",
+        "stage",
+        "candidates"
+      ],
+      "additionalProperties": false
+    },
+    "rerank_completed": {
+      "type": "object",
+      "properties": {
+        "span_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "candidate_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "before_rank": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "after_rank": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "score": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "candidate_id",
+              "before_rank",
+              "after_rank",
+              "score"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0,
+          "maxItems": 100
+        }
+      },
+      "required": [
+        "span_id",
+        "model",
+        "changes"
+      ],
+      "additionalProperties": false
+    },
+    "tree_nodes_selected": {
+      "type": "object",
+      "properties": {
+        "span_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "selections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "document_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "node_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "page_start": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "page_end": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "source_id",
+              "document_id",
+              "node_id",
+              "page_start",
+              "page_end"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0,
+          "maxItems": 12
+        }
+      },
+      "required": [
+        "span_id",
+        "depth",
+        "selections"
+      ],
+      "additionalProperties": false
+    },
+    "context_selected": {
+      "type": "object",
+      "properties": {
+        "span_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "minItems": 0,
+          "maxItems": 20
+        },
+        "excluded_candidate_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "minItems": 0,
+          "maxItems": 200
+        },
+        "token_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "token_count_kind": {
+          "type": "string",
+          "enum": [
+            "exact",
+            "estimated"
+          ]
+        },
+        "budget_tokens": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "span_id",
+        "evidence",
+        "excluded_candidate_ids",
+        "token_count",
+        "token_count_kind",
+        "budget_tokens"
+      ],
+      "additionalProperties": false
+    },
+    "answer_delta": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32768
+        },
+        "offset_chars": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "text",
+        "offset_chars"
+      ],
+      "additionalProperties": false
+    },
+    "answer_completed": {
+      "type": "object",
+      "properties": {
+        "answer_kind": {
+          "type": "string",
+          "enum": [
+            "answer",
+            "insufficient_evidence"
+          ]
+        },
+        "text_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "valid_citation_labels": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "minItems": 0
+        },
+        "invalid_citation_labels": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "answer_kind",
+        "text_sha256",
+        "valid_citation_labels",
+        "invalid_citation_labels"
+      ],
+      "additionalProperties": false
+    },
+    "usage_recorded": {
+      "type": "object",
+      "properties": {
+        "call_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "embedding",
+            "generation",
+            "tree_selection",
+            "tree_indexing",
+            "reranking"
+          ]
+        },
+        "profile_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        }
+      },
+      "required": [
+        "call_id",
+        "operation",
+        "profile_id",
+        "model",
+        "usage"
+      ],
+      "additionalProperties": false
+    },
+    "warning": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "lane_completed": {
+      "type": "object",
+      "properties": {
+        "answer_kind": {
+          "type": "string",
+          "enum": [
+            "answer",
+            "insufficient_evidence"
+          ]
+        },
+        "metrics": {
+          "$ref": "#/$defs/Timing"
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        }
+      },
+      "required": [
+        "answer_kind",
+        "metrics",
+        "usage"
+      ],
+      "additionalProperties": false
+    },
+    "lane_failed": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "$ref": "#/$defs/Error"
+        },
+        "metrics": {
+          "$ref": "#/$defs/Timing"
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        }
+      },
+      "required": [
+        "error",
+        "metrics",
+        "usage"
+      ],
+      "additionalProperties": false
+    },
+    "lane_cancelled": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "metrics": {
+          "$ref": "#/$defs/Timing"
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        }
+      },
+      "required": [
+        "reason",
+        "metrics",
+        "usage"
+      ],
+      "additionalProperties": false
+    },
+    "lane_timed_out": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "$ref": "#/$defs/Error"
+        },
+        "metrics": {
+          "$ref": "#/$defs/Timing"
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        }
+      },
+      "required": [
+        "error",
+        "metrics",
+        "usage"
+      ],
+      "additionalProperties": false
+    },
+    "run_completed": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "completed"
+        },
+        "lane_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "minItems": 1,
+          "maxItems": 6
+        }
+      },
+      "required": [
+        "status",
+        "lane_ids"
+      ],
+      "additionalProperties": false
+    },
+    "run_partial": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "partial"
+        },
+        "lane_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "minItems": 1,
+          "maxItems": 6
+        }
+      },
+      "required": [
+        "status",
+        "lane_ids"
+      ],
+      "additionalProperties": false
+    },
+    "run_failed": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "failed"
+        },
+        "lane_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "minItems": 1,
+          "maxItems": 6
+        }
+      },
+      "required": [
+        "status",
+        "lane_ids"
+      ],
+      "additionalProperties": false
+    },
+    "run_cancelled": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "cancelled"
+        },
+        "lane_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "minItems": 1,
+          "maxItems": 6
+        }
+      },
+      "required": [
+        "status",
+        "lane_ids"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "run.started"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/run_started"
+          },
+          "lane_id": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "lane.started"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/lane_started"
+          },
+          "lane_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "stage.started"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/stage_started"
+          },
+          "lane_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "stage.completed"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/stage_completed"
+          },
+          "lane_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "stage.failed"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/stage_failed"
+          },
+          "lane_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "stage.skipped"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/stage_skipped"
+          },
+          "lane_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "retrieval.candidates"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/retrieval_candidates"
+          },
+          "lane_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "rerank.completed"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/rerank_completed"
+          },
+          "lane_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "tree.nodes_selected"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/tree_nodes_selected"
+          },
+          "lane_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "context.selected"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/context_selected"
+          },
+          "lane_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "answer.delta"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/answer_delta"
+          },
+          "lane_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "answer.completed"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/answer_completed"
+          },
+          "lane_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "usage.recorded"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/usage_recorded"
+          },
+          "lane_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "warning"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/warning"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "lane.completed"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/lane_completed"
+          },
+          "lane_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "lane.failed"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/lane_failed"
+          },
+          "lane_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "lane.cancelled"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/lane_cancelled"
+          },
+          "lane_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "lane.timed_out"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/lane_timed_out"
+          },
+          "lane_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "run.completed"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/run_completed"
+          },
+          "lane_id": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "run.partial"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/run_partial"
+          },
+          "lane_id": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "run.failed"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/run_failed"
+          },
+          "lane_id": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "run.cancelled"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/run_cancelled"
+          },
+          "lane_id": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ]
+}

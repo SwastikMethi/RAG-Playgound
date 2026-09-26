@@ -1,0 +1,20 @@
+{
+  "fixture_only": true,
+  "sources": [
+    {
+      "source_id": "source_fixture_1",
+      "path": "fixtures/documents/01_starlight_guide.md",
+      "sha256": "dce51763b1c75b53483149bb9b1d0637293c272754320a8b10bab48e0c2fff0e"
+    },
+    {
+      "source_id": "source_fixture_2",
+      "path": "fixtures/documents/02_operating_procedures.md",
+      "sha256": "f2944e61f8ac5e54d9e9fb1fea8044fecc4494c4bb2b8fbd5f8815438ce15a53"
+    },
+    {
+      "source_id": "source_fixture_3",
+      "path": "fixtures/documents/03_release_notes.md",
+      "sha256": "4c773e47c93a8e9c29494c28a31f8cbe53f7be8dcf8eb117429103d4b1c9acaf"
+    }
+  ]
+}

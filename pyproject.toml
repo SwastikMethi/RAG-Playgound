@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rag-playground"
+version = "0.1.0"
+description = "An inspectable, self-hosted retrieval comparison workspace"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi>=0.115,<1", "uvicorn>=0.34,<1", "pydantic-settings>=2.8,<3",
+  "sqlalchemy>=2.0,<3", "alembic>=1.15,<2", "psycopg[binary,pool]>=3.2,<4",
+  "python-multipart>=0.0.20,<1", "jsonschema>=4.23,<5", "PyYAML>=6,<7",
+  "httpx>=0.28,<1", "rank-bm25==0.2.2", "qdrant-client>=1.13,<2",
+  "tiktoken>=0.9,<1", "cryptography>=44", "pypdf>=5,<7",
+]
+
+[project.optional-dependencies]
+pdf = ["docling>=2,<3"]
+rerank = ["sentence-transformers>=4,<6"]
+tree = ["pageindex"]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "pytest-asyncio>=0.25,<2", "openapi-spec-validator>=0.9,<1", "ruff>=0.11", "reportlab>=4,<5"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["packages/rag_runtime", "apps/api/app", "workers"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["packages", "apps/api", "."]
+asyncio_mode = "auto"
+markers = ["integration: requires dedicated PostgreSQL and Qdrant", "live: requires explicitly configured providers"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

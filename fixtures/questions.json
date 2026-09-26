@@ -1,0 +1,65 @@
+{
+  "fixture_only": true,
+  "questions": [
+    {
+      "id": "q_clock",
+      "question": "What does NEBULA-42 mean and how do I resolve it?",
+      "answerable": true,
+      "expected_facts": [
+        "Clock offset exceeds 120 seconds",
+        "Synchronize the client clock",
+        "Retry with a newly generated timestamp"
+      ],
+      "source_paths": [
+        "fixtures/documents/02_operating_procedures.md"
+      ]
+    },
+    {
+      "id": "q_plan",
+      "question": "On September 2, 2026, which plan offers 30-day retention and what is its event-rate limit?",
+      "answerable": true,
+      "expected_facts": [
+        "Pro",
+        "30 days from September 1, 2026",
+        "10,000 events per minute"
+      ],
+      "source_paths": [
+        "fixtures/documents/01_starlight_guide.md",
+        "fixtures/documents/03_release_notes.md"
+      ]
+    },
+    {
+      "id": "q_old_policy",
+      "question": "How long was Pro retention during August 2026?",
+      "answerable": true,
+      "expected_facts": [
+        "7 days"
+      ],
+      "source_paths": [
+        "fixtures/documents/03_release_notes.md"
+      ]
+    },
+    {
+      "id": "q_duplicate",
+      "question": "Why can an event appear again after a consumer restarts, and what should the consumer do?",
+      "answerable": true,
+      "expected_facts": [
+        "At-least-once delivery",
+        "Deduplicate with event_id"
+      ],
+      "source_paths": [
+        "fixtures/documents/01_starlight_guide.md",
+        "fixtures/documents/02_operating_procedures.md"
+      ]
+    },
+    {
+      "id": "q_unknown",
+      "question": "What is the annual price of the Pro plan?",
+      "answerable": false,
+      "expected_facts": [
+        "The provided documents do not specify a price"
+      ],
+      "source_paths": []
+    }
+  ]
+}

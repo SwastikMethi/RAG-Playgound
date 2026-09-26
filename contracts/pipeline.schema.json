@@ -1,0 +1,755 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "technique": {
+      "type": "string",
+      "enum": [
+        "bm25",
+        "dense",
+        "hybrid",
+        "hybrid_rerank",
+        "parent_child",
+        "pageindex"
+      ]
+    },
+    "chunking": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "strategy": {
+              "type": "string",
+              "enum": [
+                "fixed_tokens",
+                "headings"
+              ]
+            },
+            "size_tokens": {
+              "type": "integer",
+              "minimum": 64,
+              "maximum": 2048
+            },
+            "overlap_tokens": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 512
+            },
+            "tokenizer": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "tokenizer_revision": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "required": [
+            "strategy",
+            "size_tokens",
+            "overlap_tokens",
+            "tokenizer",
+            "tokenizer_revision"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "embedding": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "profile_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "model": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "dimensions": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65536
+            },
+            "document_prefix": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 1000
+            },
+            "query_prefix": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 1000
+            }
+          },
+          "required": [
+            "profile_id",
+            "model",
+            "dimensions",
+            "document_prefix",
+            "query_prefix"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "search": {
+      "type": "object",
+      "properties": {
+        "candidate_k": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "context_k": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "bm25": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "k1": {
+                  "type": "number",
+                  "minimum": 0.1,
+                  "maximum": 3
+                },
+                "b": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "epsilon": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "tokenizer_revision": {
+                  "const": "lexical_v1"
+                }
+              },
+              "required": [
+                "k1",
+                "b",
+                "epsilon",
+                "tokenizer_revision"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dense": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "metric": {
+                  "const": "cosine"
+                },
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "exact",
+                    "hnsw"
+                  ]
+                },
+                "hnsw_ef": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 8,
+                      "maximum": 1024
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "min_score": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": -1,
+                      "maximum": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "metric",
+                "mode",
+                "hnsw_ef",
+                "min_score"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rrf": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "k": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                },
+                "weights": {
+                  "const": "equal"
+                }
+              },
+              "required": [
+                "k",
+                "weights"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "candidate_k",
+        "context_k",
+        "bm25",
+        "dense",
+        "rrf"
+      ],
+      "additionalProperties": false
+    },
+    "reranker": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "model_revision": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "max_input_tokens": {
+              "type": "integer",
+              "minimum": 64,
+              "maximum": 8192
+            },
+            "device": {
+              "type": "string",
+              "enum": [
+                "cpu",
+                "cuda"
+              ]
+            }
+          },
+          "required": [
+            "model",
+            "model_revision",
+            "max_input_tokens",
+            "device"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "parent": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "max_parent_tokens": {
+              "type": "integer",
+              "minimum": 256,
+              "maximum": 4096
+            },
+            "boundary": {
+              "const": "source_and_page"
+            }
+          },
+          "required": [
+            "max_parent_tokens",
+            "boundary"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "tree": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "index_profile_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "index_model": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "selection_profile_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "selection_model": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "sdk_version": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "max_documents": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3
+            },
+            "max_depth": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4
+            },
+            "max_nodes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "max_calls": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "max_pages": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            }
+          },
+          "required": [
+            "index_profile_id",
+            "index_model",
+            "selection_profile_id",
+            "selection_model",
+            "sdk_version",
+            "max_documents",
+            "max_depth",
+            "max_nodes",
+            "max_calls",
+            "max_pages"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "generation": {
+      "type": "object",
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "max_output_tokens": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 4096
+        },
+        "context_budget_tokens": {
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 16000
+        },
+        "prompt_id": {
+          "const": "grounded_answer_v1"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "profile_id",
+        "model",
+        "temperature",
+        "max_output_tokens",
+        "context_budget_tokens",
+        "prompt_id",
+        "seed"
+      ],
+      "additionalProperties": false
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "lane_timeout_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 300000
+        }
+      },
+      "required": [
+        "lane_timeout_ms"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema_version",
+    "technique",
+    "chunking",
+    "embedding",
+    "search",
+    "reranker",
+    "parent",
+    "tree",
+    "generation",
+    "limits"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RAG Playground pipeline configuration",
+  "description": "Strict effective pipeline configuration. Profile identities and capability limits must also be checked server-side.",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "technique": {
+            "const": "bm25"
+          }
+        },
+        "required": [
+          "technique"
+        ]
+      },
+      "then": {
+        "properties": {
+          "chunking": {
+            "type": "object"
+          },
+          "embedding": {
+            "type": "null"
+          },
+          "reranker": {
+            "type": "null"
+          },
+          "parent": {
+            "type": "null"
+          },
+          "tree": {
+            "type": "null"
+          },
+          "search": {
+            "properties": {
+              "bm25": {
+                "type": "object"
+              },
+              "dense": {
+                "type": "null"
+              },
+              "rrf": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "technique": {
+            "const": "dense"
+          }
+        },
+        "required": [
+          "technique"
+        ]
+      },
+      "then": {
+        "properties": {
+          "chunking": {
+            "type": "object"
+          },
+          "embedding": {
+            "type": "object"
+          },
+          "reranker": {
+            "type": "null"
+          },
+          "parent": {
+            "type": "null"
+          },
+          "tree": {
+            "type": "null"
+          },
+          "search": {
+            "properties": {
+              "bm25": {
+                "type": "null"
+              },
+              "dense": {
+                "type": "object"
+              },
+              "rrf": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "technique": {
+            "const": "hybrid"
+          }
+        },
+        "required": [
+          "technique"
+        ]
+      },
+      "then": {
+        "properties": {
+          "chunking": {
+            "type": "object"
+          },
+          "embedding": {
+            "type": "object"
+          },
+          "reranker": {
+            "type": "null"
+          },
+          "parent": {
+            "type": "null"
+          },
+          "tree": {
+            "type": "null"
+          },
+          "search": {
+            "properties": {
+              "bm25": {
+                "type": "object"
+              },
+              "dense": {
+                "type": "object"
+              },
+              "rrf": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "technique": {
+            "const": "hybrid_rerank"
+          }
+        },
+        "required": [
+          "technique"
+        ]
+      },
+      "then": {
+        "properties": {
+          "chunking": {
+            "type": "object"
+          },
+          "embedding": {
+            "type": "object"
+          },
+          "reranker": {
+            "type": "object"
+          },
+          "parent": {
+            "type": "null"
+          },
+          "tree": {
+            "type": "null"
+          },
+          "search": {
+            "properties": {
+              "bm25": {
+                "type": "object"
+              },
+              "dense": {
+                "type": "object"
+              },
+              "rrf": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "technique": {
+            "const": "parent_child"
+          }
+        },
+        "required": [
+          "technique"
+        ]
+      },
+      "then": {
+        "properties": {
+          "chunking": {
+            "type": "object"
+          },
+          "embedding": {
+            "type": "object"
+          },
+          "reranker": {
+            "type": "null"
+          },
+          "parent": {
+            "type": "object"
+          },
+          "tree": {
+            "type": "null"
+          },
+          "search": {
+            "properties": {
+              "bm25": {
+                "type": "null"
+              },
+              "dense": {
+                "type": "object"
+              },
+              "rrf": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "technique": {
+            "const": "pageindex"
+          }
+        },
+        "required": [
+          "technique"
+        ]
+      },
+      "then": {
+        "properties": {
+          "chunking": {
+            "type": "null"
+          },
+          "embedding": {
+            "type": "null"
+          },
+          "reranker": {
+            "type": "null"
+          },
+          "parent": {
+            "type": "null"
+          },
+          "tree": {
+            "type": "object"
+          },
+          "search": {
+            "properties": {
+              "bm25": {
+                "type": "null"
+              },
+              "dense": {
+                "type": "null"
+              },
+              "rrf": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

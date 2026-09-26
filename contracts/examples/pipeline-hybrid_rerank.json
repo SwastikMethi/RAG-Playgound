@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0.0",
+  "technique": "hybrid_rerank",
+  "chunking": {
+    "strategy": "fixed_tokens",
+    "size_tokens": 512,
+    "overlap_tokens": 64,
+    "tokenizer": "cl100k_base",
+    "tokenizer_revision": "PIN_INSTALLED_TOKENIZER_VERSION"
+  },
+  "embedding": {
+    "profile_id": "example_embedding_profile",
+    "model": "REPLACE_WITH_SUPPORTED_EMBEDDING_MODEL",
+    "dimensions": 384,
+    "document_prefix": "",
+    "query_prefix": ""
+  },
+  "search": {
+    "candidate_k": 20,
+    "context_k": 5,
+    "bm25": {
+      "k1": 1.5,
+      "b": 0.75,
+      "epsilon": 0.25,
+      "tokenizer_revision": "lexical_v1"
+    },
+    "dense": {
+      "metric": "cosine",
+      "mode": "exact",
+      "hnsw_ef": null,
+      "min_score": null
+    },
+    "rrf": {
+      "k": 60,
+      "weights": "equal"
+    }
+  },
+  "reranker": {
+    "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
+    "model_revision": null,
+    "max_input_tokens": 512,
+    "device": "cpu"
+  },
+  "parent": null,
+  "tree": null,
+  "generation": {
+    "profile_id": "example_answer_profile",
+    "model": "REPLACE_WITH_SUPPORTED_ANSWER_MODEL",
+    "temperature": 0,
+    "max_output_tokens": 512,
+    "context_budget_tokens": 3000,
+    "prompt_id": "grounded_answer_v1",
+    "seed": null
+  },
+  "limits": {
+    "lane_timeout_ms": 90000
+  }
+}

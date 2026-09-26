@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0.0",
+  "export_id": "export_fixture_example",
+  "technique": "hybrid_rerank",
+  "pipeline_sha256": "fdcaf556ee9658bdd6868b1a9f96a0efafe7a6413320948f5e64381233e356c0",
+  "original_config_sha256": "fdcaf556ee9658bdd6868b1a9f96a0efafe7a6413320948f5e64381233e356c0",
+  "corpus_fingerprint": "b48be73d0f120bd1c5531a828c1d85d7b680851ec645447ab1f8991f85d2dc30",
+  "runtime_revision": "EXAMPLE_ONLY_NOT_AN_IMPLEMENTED_RUNTIME",
+  "dependency_lock_sha256": "c0691be1d260c43da51461e11bc179f2fdc848a29f5f8ea12482e6f319c849e6",
+  "prompt_id": "grounded_answer_v1",
+  "prompt_sha256": "9f8abd46231bee7c0b84ed2bb9dd5b7fc3986829d10b731580f51c89f0c50f96",
+  "source_hashes": [
+    {
+      "source_id": "source_fixture_1",
+      "sha256": "dce51763b1c75b53483149bb9b1d0637293c272754320a8b10bab48e0c2fff0e",
+      "source_format": "markdown",
+      "file_alias": "source_1.md"
+    },
+    {
+      "source_id": "source_fixture_2",
+      "sha256": "f2944e61f8ac5e54d9e9fb1fea8044fecc4494c4bb2b8fbd5f8815438ce15a53",
+      "source_format": "markdown",
+      "file_alias": "source_2.md"
+    },
+    {
+      "source_id": "source_fixture_3",
+      "sha256": "4c773e47c93a8e9c29494c28a31f8cbe53f7be8dcf8eb117429103d4b1c9acaf",
+      "source_format": "markdown",
+      "file_alias": "source_3.md"
+    }
+  ],
+  "model_revisions": {
+    "embedding": null,
+    "generation": null,
+    "reranker": null,
+    "tree_indexing": null,
+    "tree_selection": null
+  },
+  "tokenizer_revision": "PIN_INSTALLED_TOKENIZER_VERSION",
+  "vector_dimensions": 384,
+  "include_data": false,
+  "verification": {
+    "static": {
+      "status": "not_run",
+      "checked_at": null,
+      "details": "Documentation example only; no application export has been executed.",
+      "recorded_boundaries": []
+    },
+    "offline_replay": {
+      "status": "not_run",
+      "checked_at": null,
+      "details": "Documentation example only; no application export has been executed.",
+      "recorded_boundaries": []
+    },
+    "live_replay": {
+      "status": "not_run",
+      "checked_at": null,
+      "details": "Documentation example only; no application export has been executed.",
+      "recorded_boundaries": []
+    }
+  },
+  "limitations": [
+    "Fictional schema example, not a tested application export.",
+    "Replace all example profiles and validate model dimensions.",
+    "No benchmark or live performance claim is made."
+  ]
+}

@@ -1,0 +1,366 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "export_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "technique": {
+      "type": "string",
+      "enum": [
+        "bm25",
+        "dense",
+        "hybrid",
+        "hybrid_rerank",
+        "parent_child",
+        "pageindex"
+      ]
+    },
+    "pipeline_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "original_config_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "corpus_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "runtime_revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "dependency_lock_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "prompt_id": {
+      "const": "grounded_answer_v1"
+    },
+    "prompt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_hashes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "source_format": {
+            "type": "string",
+            "enum": [
+              "pdf",
+              "markdown",
+              "text",
+              "postgres_snapshot"
+            ]
+          },
+          "file_alias": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+\\.(pdf|md|txt|json)$"
+          }
+        },
+        "required": [
+          "source_id",
+          "sha256",
+          "source_format",
+          "file_alias"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "maxItems": 20
+    },
+    "model_revisions": {
+      "type": "object",
+      "properties": {
+        "embedding": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "generation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reranker": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tree_indexing": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tree_selection": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "embedding",
+        "generation",
+        "reranker",
+        "tree_indexing",
+        "tree_selection"
+      ],
+      "additionalProperties": false
+    },
+    "tokenizer_revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "vector_dimensions": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65536
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "include_data": {
+      "type": "boolean"
+    },
+    "verification": {
+      "type": "object",
+      "properties": {
+        "static": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "passed",
+                "failed",
+                "not_run"
+              ]
+            },
+            "checked_at": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "details": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 2000
+            },
+            "recorded_boundaries": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "minItems": 0,
+              "maxItems": 20
+            }
+          },
+          "required": [
+            "status",
+            "checked_at",
+            "details",
+            "recorded_boundaries"
+          ],
+          "additionalProperties": false
+        },
+        "offline_replay": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "passed",
+                "failed",
+                "not_run"
+              ]
+            },
+            "checked_at": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "details": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 2000
+            },
+            "recorded_boundaries": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "minItems": 0,
+              "maxItems": 20
+            }
+          },
+          "required": [
+            "status",
+            "checked_at",
+            "details",
+            "recorded_boundaries"
+          ],
+          "additionalProperties": false
+        },
+        "live_replay": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "passed",
+                "failed",
+                "not_run"
+              ]
+            },
+            "checked_at": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "details": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 2000
+            },
+            "recorded_boundaries": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "minItems": 0,
+              "maxItems": 20
+            }
+          },
+          "required": [
+            "status",
+            "checked_at",
+            "details",
+            "recorded_boundaries"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "static",
+        "offline_replay",
+        "live_replay"
+      ],
+      "additionalProperties": false
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      },
+      "minItems": 0,
+      "maxItems": 30
+    }
+  },
+  "required": [
+    "schema_version",
+    "export_id",
+    "technique",
+    "pipeline_sha256",
+    "original_config_sha256",
+    "corpus_fingerprint",
+    "runtime_revision",
+    "dependency_lock_sha256",
+    "prompt_id",
+    "prompt_sha256",
+    "source_hashes",
+    "model_revisions",
+    "tokenizer_revision",
+    "vector_dimensions",
+    "include_data",
+    "verification",
+    "limitations"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Portable export manifest",
+  "description": "Contains no secrets. Verification statuses describe checks actually performed."
+}

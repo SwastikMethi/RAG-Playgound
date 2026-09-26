@@ -1,0 +1,3794 @@
+openapi: 3.1.0
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+info:
+  title: RAG Playground API
+  version: 1.0.0
+  description: Single-owner playground API. This is an implementation contract, not a running service.
+    All private resources require bearer authorization.
+servers:
+- url: /api/v1
+security:
+- ownerToken: []
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Process liveness
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+      security: []
+  /projects:
+    get:
+      operationId: listProjects
+      summary: List projects
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Project'
+                    minItems: 0
+                  next_cursor:
+                    anyOf:
+                    - type: string
+                      minLength: 1
+                      maxLength: 200
+                    - type: 'null'
+                required:
+                - items
+                - next_cursor
+                additionalProperties: false
+      parameters:
+      - &id002
+        name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - &id003
+        name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 200
+    post:
+      operationId: createProject
+      summary: Create a project
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProject'
+  /projects/{project_id}:
+    get:
+      operationId: getProject
+      summary: Read project metadata
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+      parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema: &id001
+          type: string
+          minLength: 1
+          maxLength: 128
+  /projects/{project_id}/sources:
+    get:
+      operationId: listSources
+      summary: List immutable source revisions
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Source'
+                    minItems: 0
+                  next_cursor:
+                    anyOf:
+                    - type: string
+                      minLength: 1
+                      maxLength: 200
+                    - type: 'null'
+                required:
+                - items
+                - next_cursor
+                additionalProperties: false
+      parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema: *id001
+      - *id002
+      - *id003
+  /projects/{project_id}/sources/upload:
+    post:
+      operationId: uploadSource
+      summary: Upload one supported file
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '202':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Source'
+      parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema: *id001
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadSource'
+  /sources/{source_id}:
+    get:
+      operationId: getSource
+      summary: Read source state
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Source'
+      parameters:
+      - name: source_id
+        in: path
+        required: true
+        schema: *id001
+    delete:
+      operationId: deleteSource
+      summary: Delete source and confirmed dependent content
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '202':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAccepted'
+      parameters:
+      - name: source_id
+        in: path
+        required: true
+        schema: *id001
+      - name: cascade
+        in: query
+        required: true
+        schema:
+          type: boolean
+          const: true
+      - name: confirmation_source_id
+        in: query
+        required: true
+        schema: *id001
+  /sources/{source_id}/content:
+    get:
+      operationId: getSourceContent
+      summary: Read protected source preview
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourcePreview'
+      parameters:
+      - name: source_id
+        in: path
+        required: true
+        schema: *id001
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+      - name: start_char
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+      - name: max_chars
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50000
+          default: 8000
+  /sources/{source_id}/file:
+    get:
+      operationId: getSourceFile
+      summary: Read authorized original source bytes
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Safe original file; content type reflects validated source
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            text/plain:
+              schema:
+                type: string
+                format: binary
+            text/markdown:
+              schema:
+                type: string
+                format: binary
+      parameters:
+      - name: source_id
+        in: path
+        required: true
+        schema: *id001
+  /sources/{source_id}/impact:
+    get:
+      operationId: getSourceImpact
+      summary: Inspect source deletion impact
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceImpact'
+      parameters:
+      - name: source_id
+        in: path
+        required: true
+        schema: *id001
+  /projects/{project_id}/connections:
+    get:
+      operationId: listConnections
+      summary: List sanitized database connections
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PublicConnection'
+                    minItems: 0
+                  next_cursor:
+                    anyOf:
+                    - type: string
+                      minLength: 1
+                      maxLength: 200
+                    - type: 'null'
+                required:
+                - items
+                - next_cursor
+                additionalProperties: false
+      parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema: *id001
+      - *id002
+      - *id003
+    post:
+      operationId: createConnection
+      summary: Store an encrypted PostgreSQL connection
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicConnection'
+      parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema: *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConnection'
+  /connections/{connection_id}:
+    get:
+      operationId: getConnection
+      summary: Read sanitized connection metadata
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicConnection'
+      parameters:
+      - name: connection_id
+        in: path
+        required: true
+        schema: *id001
+    delete:
+      operationId: deleteConnection
+      summary: Remove connection credentials; preserve captured snapshots
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '204':
+          description: Success
+      parameters:
+      - name: connection_id
+        in: path
+        required: true
+        schema: *id001
+  /connections/{connection_id}/relations:
+    get:
+      operationId: listRelations
+      summary: List allowed relations and selectable columns
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Relation'
+                    minItems: 0
+                required:
+                - items
+                additionalProperties: false
+      parameters:
+      - name: connection_id
+        in: path
+        required: true
+        schema: *id001
+  /projects/{project_id}/sources/postgres:
+    post:
+      operationId: capturePostgres
+      summary: Capture a bounded PostgreSQL text snapshot
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '202':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Source'
+      parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema: *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CapturePostgres'
+  /projects/{project_id}/corpus-versions:
+    post:
+      operationId: createCorpus
+      summary: Freeze ready source membership
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Corpus'
+      parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema: *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCorpus'
+    get:
+      operationId: listCorpora
+      summary: List frozen corpus versions
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Corpus'
+                    minItems: 0
+                  next_cursor:
+                    anyOf:
+                    - type: string
+                      minLength: 1
+                      maxLength: 200
+                    - type: 'null'
+                required:
+                - items
+                - next_cursor
+                additionalProperties: false
+      parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema: *id001
+      - *id002
+      - *id003
+  /corpus-versions/{corpus_version_id}:
+    get:
+      operationId: getCorpus
+      summary: Read a frozen corpus version
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Corpus'
+      parameters:
+      - name: corpus_version_id
+        in: path
+        required: true
+        schema: *id001
+  /projects/{project_id}/configurations:
+    get:
+      operationId: listConfigurations
+      summary: List configuration revisions
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Configuration'
+                    minItems: 0
+                  next_cursor:
+                    anyOf:
+                    - type: string
+                      minLength: 1
+                      maxLength: 200
+                    - type: 'null'
+                required:
+                - items
+                - next_cursor
+                additionalProperties: false
+      parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema: *id001
+      - *id002
+      - *id003
+    post:
+      operationId: saveConfiguration
+      summary: Create an immutable configuration revision
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Configuration'
+      parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema: *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveConfiguration'
+  /configurations/{config_id}:
+    get:
+      operationId: getConfiguration
+      summary: Read one immutable configuration
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Configuration'
+      parameters:
+      - name: config_id
+        in: path
+        required: true
+        schema: *id001
+  /projects/{project_id}/preparations:
+    post:
+      operationId: prepareConfiguration
+      summary: Prepare or reuse an index bundle
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '202':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndexBundle'
+      parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema: *id001
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 8
+          maxLength: 200
+        description: Deduplicates matching create requests for 24 hours.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrepareRequest'
+  /index-bundles/{bundle_id}:
+    get:
+      operationId: getIndexBundle
+      summary: Read readiness and setup metrics
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndexBundle'
+      parameters:
+      - name: bundle_id
+        in: path
+        required: true
+        schema: *id001
+  /projects/{project_id}/runs:
+    post:
+      operationId: createRun
+      summary: Fan one question into selected ready lanes
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '202':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+      parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema: *id001
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 8
+          maxLength: 200
+        description: Deduplicates matching create requests for 24 hours.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRun'
+    get:
+      operationId: listRuns
+      summary: List comparison history
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Run'
+                    minItems: 0
+                  next_cursor:
+                    anyOf:
+                    - type: string
+                      minLength: 1
+                      maxLength: 200
+                    - type: 'null'
+                required:
+                - items
+                - next_cursor
+                additionalProperties: false
+      parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema: *id001
+      - *id002
+      - *id003
+  /runs/{run_id}:
+    get:
+      operationId: getRun
+      summary: Read an atomic run snapshot
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema: *id001
+  /runs/{run_id}/events:
+    get:
+      operationId: streamRunEvents
+      summary: Stream durable trace frames
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Ordered trace events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+          x-event-schema:
+            $ref: ./trace-event.schema.json
+      description: SSE event name trace, id run_id:seq, JSON data conforming to trace-event.schema.json.
+        Cursor values must agree when both forms are supplied. Heartbeat every 15 seconds; closes after
+        terminal event.
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema: *id001
+      - name: after_seq
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - name: Last-Event-ID
+        in: header
+        required: false
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 200
+  /runs/{run_id}/cancel:
+    post:
+      operationId: cancelRun
+      summary: Request cancellation of all unfinished lanes
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '202':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancelResult'
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema: *id001
+  /runs/{run_id}/lanes/{lane_id}/cancel:
+    post:
+      operationId: cancelLane
+      summary: Request cancellation of one lane
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '202':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancelResult'
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema: *id001
+      - name: lane_id
+        in: path
+        required: true
+        schema: *id001
+  /runs/{run_id}/lanes/{lane_id}/evidence:
+    get:
+      operationId: getLaneEvidence
+      summary: Inspect protected evidence
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceList'
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema: *id001
+      - name: lane_id
+        in: path
+        required: true
+        schema: *id001
+  /runs/{run_id}/lanes/{lane_id}/feedback:
+    put:
+      operationId: saveFeedback
+      summary: Save manual lane feedback
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Feedback'
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema: *id001
+      - name: lane_id
+        in: path
+        required: true
+        schema: *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Feedback'
+  /runs/{run_id}/preference:
+    put:
+      operationId: savePreference
+      summary: Save a preferred lane or tie
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Preference'
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema: *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Preference'
+  /runs/{run_id}/lanes/{lane_id}/exports:
+    post:
+      operationId: createExport
+      summary: Build a portable implementation
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '202':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Export'
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema: *id001
+      - name: lane_id
+        in: path
+        required: true
+        schema: *id001
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 8
+          maxLength: 200
+        description: Deduplicates matching create requests for 24 hours.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportRequest'
+  /exports/{export_id}:
+    get:
+      operationId: getExport
+      summary: Read export state and verification
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Export'
+      parameters:
+      - name: export_id
+        in: path
+        required: true
+        schema: *id001
+  /exports/{export_id}/download:
+    get:
+      operationId: downloadExport
+      summary: Download authorized ready archive
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Portable application archive
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+      parameters:
+      - name: export_id
+        in: path
+        required: true
+        schema: *id001
+  /system/capabilities:
+    get:
+      operationId: getCapabilities
+      summary: Read technique registry and availability
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Capability'
+                    minItems: 0
+                required:
+                - items
+                additionalProperties: false
+  /system/profiles:
+    get:
+      operationId: getProfiles
+      summary: Read public provider metadata
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Profile'
+                    minItems: 0
+                required:
+                - items
+                additionalProperties: false
+  /jobs/{job_id}:
+    get:
+      operationId: getJob
+      summary: Read job progress
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema: *id001
+components:
+  securitySchemes:
+    ownerToken:
+      type: http
+      scheme: bearer
+      description: Owner application token; never place in URLs.
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 80
+        message:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        retryable: &id005
+          type: boolean
+        details:
+          type: object
+        request_id:
+          anyOf:
+          - *id001
+          - type: 'null'
+      required:
+      - code
+      - message
+      - retryable
+      - details
+      - request_id
+      additionalProperties: false
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/Error'
+      required:
+      - error
+      additionalProperties: false
+    Project:
+      type: object
+      properties:
+        id: *id001
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        created_at: &id004
+          type: string
+          format: date-time
+        updated_at: *id004
+      required:
+      - id
+      - name
+      - created_at
+      - updated_at
+      additionalProperties: false
+    CreateProject:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+      required:
+      - name
+      additionalProperties: false
+    Job:
+      type: object
+      properties:
+        id: *id001
+        project_id: *id001
+        kind:
+          type: string
+          enum:
+          - ingest_source
+          - prepare_index
+          - compare_run
+          - export_lane
+          - delete_source
+        resource_id: *id001
+        status:
+          type: string
+          enum:
+          - queued
+          - running
+          - succeeded
+          - failed
+          - cancelled
+        created_at: *id004
+        started_at:
+          anyOf:
+          - *id004
+          - type: 'null'
+        completed_at:
+          anyOf:
+          - *id004
+          - type: 'null'
+        progress:
+          type: object
+        error:
+          anyOf:
+          - $ref: '#/components/schemas/Error'
+          - type: 'null'
+      required:
+      - id
+      - project_id
+      - kind
+      - resource_id
+      - status
+      - created_at
+      - started_at
+      - completed_at
+      - progress
+      - error
+      additionalProperties: false
+    Source:
+      type: object
+      properties:
+        id: *id001
+        project_id: *id001
+        kind:
+          type: string
+          enum:
+          - file
+          - postgres
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 300
+        status:
+          type: string
+          enum:
+          - processing
+          - ready
+          - failed
+          - deleting
+          - deleted
+        content_sha256:
+          anyOf:
+          - &id006
+            type: string
+            pattern: ^[a-f0-9]{64}$
+          - type: 'null'
+        size_bytes:
+          anyOf:
+          - type: integer
+            minimum: 0
+          - type: 'null'
+        metadata:
+          type: object
+        job_id:
+          anyOf:
+          - *id001
+          - type: 'null'
+        created_at: *id004
+        error:
+          anyOf:
+          - $ref: '#/components/schemas/Error'
+          - type: 'null'
+      required:
+      - id
+      - project_id
+      - kind
+      - display_name
+      - status
+      - content_sha256
+      - size_bytes
+      - metadata
+      - job_id
+      - created_at
+      - error
+      additionalProperties: false
+    SourcePreview:
+      type: object
+      properties:
+        source_id: *id001
+        content:
+          type: string
+          minLength: 0
+          maxLength: 50000
+        location:
+          type: object
+          properties:
+            kind:
+              type: string
+              enum:
+              - pdf
+              - text
+              - database
+            page_start:
+              anyOf:
+              - type: integer
+                minimum: 1
+              - type: 'null'
+            page_end:
+              anyOf:
+              - type: integer
+                minimum: 1
+              - type: 'null'
+            char_start:
+              anyOf:
+              - type: integer
+                minimum: 0
+              - type: 'null'
+            char_end:
+              anyOf:
+              - type: integer
+                minimum: 0
+              - type: 'null'
+            line_start:
+              anyOf:
+              - type: integer
+                minimum: 1
+              - type: 'null'
+            line_end:
+              anyOf:
+              - type: integer
+                minimum: 1
+              - type: 'null'
+            relation:
+              anyOf:
+              - type: string
+                minLength: 1
+                maxLength: 300
+              - type: 'null'
+            record_key:
+              anyOf:
+              - type: object
+                additionalProperties:
+                  type:
+                  - string
+                  - number
+                  - boolean
+                  - 'null'
+              - type: 'null'
+          required:
+          - kind
+          - page_start
+          - page_end
+          - char_start
+          - char_end
+          - line_start
+          - line_end
+          - relation
+          - record_key
+          additionalProperties: false
+        truncated: *id005
+      required:
+      - source_id
+      - content
+      - location
+      - truncated
+      additionalProperties: false
+    SourceImpact:
+      type: object
+      properties:
+        source_id: *id001
+        corpus_count:
+          type: integer
+          minimum: 0
+        run_count:
+          type: integer
+          minimum: 0
+        bundle_count:
+          type: integer
+          minimum: 0
+        export_count:
+          type: integer
+          minimum: 0
+        active_job_ids:
+          type: array
+          items: *id001
+          minItems: 0
+      required:
+      - source_id
+      - corpus_count
+      - run_count
+      - bundle_count
+      - export_count
+      - active_job_ids
+      additionalProperties: false
+    UploadSource:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 300
+      required:
+      - file
+      additionalProperties: false
+    PublicConnection:
+      type: object
+      properties:
+        id: *id001
+        project_id: *id001
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        kind:
+          const: postgres
+        host:
+          type: string
+          minLength: 1
+          maxLength: 300
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        database:
+          type: string
+          minLength: 1
+          maxLength: 200
+        username:
+          type: string
+          minLength: 1
+          maxLength: 200
+        ssl_mode:
+          type: string
+          enum:
+          - verify-full
+          - require
+          - disable
+        allowed_schemas:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 200
+          minItems: 1
+          maxItems: 20
+        created_at: *id004
+      required:
+      - id
+      - project_id
+      - name
+      - kind
+      - host
+      - port
+      - database
+      - username
+      - ssl_mode
+      - allowed_schemas
+      - created_at
+      additionalProperties: false
+    CreateConnection:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        host:
+          type: string
+          minLength: 1
+          maxLength: 300
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        database:
+          type: string
+          minLength: 1
+          maxLength: 200
+        username:
+          type: string
+          minLength: 1
+          maxLength: 200
+        password:
+          type: string
+          minLength: 1
+          maxLength: 4096
+          writeOnly: true
+        ssl_mode:
+          type: string
+          enum:
+          - verify-full
+          - require
+          - disable
+        allowed_schemas:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 200
+          minItems: 1
+          maxItems: 20
+      required:
+      - name
+      - host
+      - port
+      - database
+      - username
+      - password
+      - ssl_mode
+      - allowed_schemas
+      additionalProperties: false
+    Relation:
+      type: object
+      properties:
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 200
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        kind:
+          type: string
+          enum:
+          - table
+          - view
+        columns:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                minLength: 1
+                maxLength: 200
+              data_type:
+                type: string
+                minLength: 1
+                maxLength: 200
+              nullable: *id005
+              selectable: *id005
+            required:
+            - name
+            - data_type
+            - nullable
+            - selectable
+            additionalProperties: false
+          minItems: 1
+        suggested_key_columns:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 200
+          minItems: 0
+      required:
+      - schema
+      - name
+      - kind
+      - columns
+      - suggested_key_columns
+      additionalProperties: false
+    CapturePostgres:
+      type: object
+      properties:
+        connection_id: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 200
+        relation:
+          type: string
+          minLength: 1
+          maxLength: 200
+        key_columns:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 200
+          minItems: 1
+          maxItems: 8
+        text_columns:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 200
+          minItems: 1
+          maxItems: 20
+        updated_at_column:
+          anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 200
+          - type: 'null'
+        max_rows:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 300
+      required:
+      - connection_id
+      - schema
+      - relation
+      - key_columns
+      - text_columns
+      - updated_at_column
+      - max_rows
+      - display_name
+      additionalProperties: false
+    CreateCorpus:
+      type: object
+      properties:
+        source_ids:
+          type: array
+          items: *id001
+          minItems: 1
+          maxItems: 20
+          uniqueItems: true
+      required:
+      - source_ids
+      additionalProperties: false
+    Corpus:
+      type: object
+      properties:
+        id: *id001
+        project_id: *id001
+        ordinal:
+          type: integer
+          minimum: 1
+        source_ids:
+          type: array
+          items: *id001
+          minItems: 1
+          maxItems: 20
+        content_fingerprint: *id006
+        status:
+          const: ready
+        created_at: *id004
+      required:
+      - id
+      - project_id
+      - ordinal
+      - source_ids
+      - content_fingerprint
+      - status
+      - created_at
+      additionalProperties: false
+    SaveConfiguration:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        based_on_config_id:
+          anyOf:
+          - *id001
+          - type: 'null'
+        config:
+          $ref: ./pipeline.schema.json
+      required:
+      - name
+      - config
+      additionalProperties: false
+    Configuration:
+      type: object
+      properties:
+        id: *id001
+        family_id: *id001
+        project_id: *id001
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        revision:
+          type: integer
+          minimum: 1
+        config:
+          $ref: ./pipeline.schema.json
+        config_sha256: *id006
+        created_at: *id004
+      required:
+      - id
+      - family_id
+      - project_id
+      - name
+      - revision
+      - config
+      - config_sha256
+      - created_at
+      additionalProperties: false
+    PrepareRequest:
+      type: object
+      properties:
+        corpus_version_id: *id001
+        config_id: *id001
+      required:
+      - corpus_version_id
+      - config_id
+      additionalProperties: false
+    IndexBundle:
+      type: object
+      properties:
+        id: *id001
+        project_id: *id001
+        corpus_version_id: *id001
+        config_id: *id001
+        status:
+          type: string
+          enum:
+          - queued
+          - preparing
+          - ready
+          - failed
+        job_id:
+          anyOf:
+          - *id001
+          - type: 'null'
+        requirements_sha256: *id006
+        preparation_ms:
+          anyOf:
+          - type: number
+            minimum: 0
+          - type: 'null'
+        preparation_reused: *id005
+        warnings:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 2000
+          minItems: 0
+        error:
+          anyOf:
+          - $ref: '#/components/schemas/Error'
+          - type: 'null'
+      required:
+      - id
+      - project_id
+      - corpus_version_id
+      - config_id
+      - status
+      - job_id
+      - requirements_sha256
+      - preparation_ms
+      - preparation_reused
+      - warnings
+      - error
+      additionalProperties: false
+    CreateRun:
+      type: object
+      properties:
+        corpus_version_id: *id001
+        question:
+          type: string
+          minLength: 1
+          maxLength: 8000
+        lanes:
+          type: array
+          items:
+            type: object
+            properties:
+              config_id: *id001
+              bundle_id: *id001
+            required:
+            - config_id
+            - bundle_id
+            additionalProperties: false
+          minItems: 1
+          maxItems: 6
+        parent_run_id:
+          anyOf:
+          - *id001
+          - type: 'null'
+      required:
+      - corpus_version_id
+      - question
+      - lanes
+      additionalProperties: false
+    Timing:
+      $ref: ./trace-event.schema.json#/$defs/Timing
+    Usage:
+      $ref: ./trace-event.schema.json#/$defs/Usage
+    Provenance:
+      type: object
+      properties:
+        runtime_revision:
+          type: string
+          minLength: 1
+          maxLength: 200
+        prompt_sha256: *id006
+        profile_fingerprints:
+          type: object
+          properties:
+            generation: *id006
+            embedding:
+              anyOf:
+              - *id006
+              - type: 'null'
+            tree_indexing:
+              anyOf:
+              - *id006
+              - type: 'null'
+            tree_selection:
+              anyOf:
+              - *id006
+              - type: 'null'
+          required:
+          - generation
+          - embedding
+          - tree_indexing
+          - tree_selection
+          additionalProperties: false
+        model_revisions:
+          type: object
+          properties:
+            generation:
+              anyOf:
+              - type: string
+                minLength: 1
+                maxLength: 300
+              - type: 'null'
+            embedding:
+              anyOf:
+              - type: string
+                minLength: 1
+                maxLength: 300
+              - type: 'null'
+            reranker:
+              anyOf:
+              - type: string
+                minLength: 1
+                maxLength: 300
+              - type: 'null'
+            tree_indexing:
+              anyOf:
+              - type: string
+                minLength: 1
+                maxLength: 300
+              - type: 'null'
+            tree_selection:
+              anyOf:
+              - type: string
+                minLength: 1
+                maxLength: 300
+              - type: 'null'
+          required:
+          - generation
+          - embedding
+          - reranker
+          - tree_indexing
+          - tree_selection
+          additionalProperties: false
+        parser_revisions:
+          type: array
+          items:
+            type: object
+            properties:
+              source_id: *id001
+              parser:
+                type: string
+                minLength: 1
+                maxLength: 200
+              revision:
+                type: string
+                minLength: 1
+                maxLength: 200
+            required:
+            - source_id
+            - parser
+            - revision
+            additionalProperties: false
+          minItems: 1
+          maxItems: 20
+        artifact_ids:
+          type: array
+          items: *id001
+          minItems: 1
+          maxItems: 100
+        cache_state:
+          type: string
+          enum:
+          - cold
+          - warm
+          - mixed
+          - unknown
+      required:
+      - runtime_revision
+      - prompt_sha256
+      - profile_fingerprints
+      - model_revisions
+      - parser_revisions
+      - artifact_ids
+      - cache_state
+      additionalProperties: false
+    Lane:
+      type: object
+      properties:
+        id: *id001
+        config_id: *id001
+        bundle_id: *id001
+        config_snapshot:
+          $ref: ./pipeline.schema.json
+        provenance:
+          $ref: '#/components/schemas/Provenance'
+        technique:
+          type: string
+          enum: &id007
+          - bm25
+          - dense
+          - hybrid
+          - hybrid_rerank
+          - parent_child
+          - pageindex
+        status:
+          type: string
+          enum:
+          - queued
+          - running
+          - completed
+          - failed
+          - cancelled
+          - timed_out
+        answer:
+          type: string
+          minLength: 0
+          maxLength: 200000
+        answer_kind:
+          anyOf:
+          - type: string
+            enum:
+            - answer
+            - insufficient_evidence
+          - type: 'null'
+        metrics:
+          $ref: '#/components/schemas/Timing'
+        usage:
+          $ref: '#/components/schemas/Usage'
+        warnings:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 2000
+          minItems: 0
+        error:
+          anyOf:
+          - $ref: '#/components/schemas/Error'
+          - type: 'null'
+      required:
+      - id
+      - config_id
+      - bundle_id
+      - config_snapshot
+      - provenance
+      - technique
+      - status
+      - answer
+      - answer_kind
+      - metrics
+      - usage
+      - warnings
+      - error
+      additionalProperties: false
+    Run:
+      type: object
+      properties:
+        id: *id001
+        project_id: *id001
+        corpus_version_id: *id001
+        question:
+          type: string
+          minLength: 1
+          maxLength: 8000
+        parent_run_id:
+          anyOf:
+          - *id001
+          - type: 'null'
+        status:
+          type: string
+          enum:
+          - queued
+          - running
+          - completed
+          - partial
+          - failed
+          - cancelled
+        created_at: *id004
+        started_at:
+          anyOf:
+          - *id004
+          - type: 'null'
+        completed_at:
+          anyOf:
+          - *id004
+          - type: 'null'
+        last_seq:
+          type: integer
+          minimum: 0
+        queue_ms:
+          anyOf:
+          - type: number
+            minimum: 0
+          - type: 'null'
+        lanes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Lane'
+          minItems: 1
+          maxItems: 6
+      required:
+      - id
+      - project_id
+      - corpus_version_id
+      - question
+      - parent_run_id
+      - status
+      - created_at
+      - started_at
+      - completed_at
+      - last_seq
+      - queue_ms
+      - lanes
+      additionalProperties: false
+    CancelResult:
+      type: object
+      properties:
+        run_id: *id001
+        lane_id:
+          anyOf:
+          - *id001
+          - type: 'null'
+        cancel_requested: *id005
+      required:
+      - run_id
+      - lane_id
+      - cancel_requested
+      additionalProperties: false
+    EvidenceList:
+      type: object
+      properties:
+        run_id: *id001
+        lane_id: *id001
+        evidence:
+          type: array
+          items:
+            $ref: ./trace-event.schema.json#/$defs/Evidence
+          minItems: 0
+          maxItems: 200
+      required:
+      - run_id
+      - lane_id
+      - evidence
+      additionalProperties: false
+    Feedback:
+      type: object
+      properties:
+        helpful:
+          type: string
+          enum:
+          - helpful
+          - unhelpful
+          - unset
+        note:
+          type: string
+          minLength: 0
+          maxLength: 2000
+      required:
+      - helpful
+      - note
+      additionalProperties: false
+    Preference:
+      type: object
+      properties:
+        preferred_lane_id:
+          anyOf:
+          - *id001
+          - type: 'null'
+        tied_lane_ids:
+          type: array
+          items: *id001
+          minItems: 0
+          maxItems: 6
+          uniqueItems: true
+        note:
+          type: string
+          minLength: 0
+          maxLength: 2000
+      required:
+      - preferred_lane_id
+      - tied_lane_ids
+      - note
+      additionalProperties: false
+    ExportRequest:
+      type: object
+      properties:
+        include_data:
+          type: boolean
+          default: false
+        verification_mode:
+          type: string
+          enum:
+          - offline
+          - live
+          default: offline
+      required:
+      - include_data
+      - verification_mode
+      additionalProperties: false
+    Export:
+      type: object
+      properties:
+        id: *id001
+        project_id: *id001
+        run_id: *id001
+        lane_id: *id001
+        status:
+          type: string
+          enum:
+          - queued
+          - building
+          - ready
+          - failed
+        include_data: *id005
+        job_id:
+          anyOf:
+          - *id001
+          - type: 'null'
+        manifest:
+          anyOf:
+          - $ref: ./export-manifest.schema.json
+          - type: 'null'
+        download_url:
+          anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 1000
+          - type: 'null'
+        error:
+          anyOf:
+          - $ref: '#/components/schemas/Error'
+          - type: 'null'
+      required:
+      - id
+      - project_id
+      - run_id
+      - lane_id
+      - status
+      - include_data
+      - job_id
+      - manifest
+      - download_url
+      - error
+      additionalProperties: false
+    Capability:
+      type: object
+      properties:
+        technique:
+          type: string
+          enum: *id007
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        available: *id005
+        unavailable_reason:
+          anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 2000
+          - type: 'null'
+        supported_source_kinds:
+          type: array
+          items:
+            type: string
+            enum:
+            - pdf
+            - markdown
+            - text
+            - postgres
+          minItems: 0
+        export_supported: *id005
+      required:
+      - technique
+      - display_name
+      - description
+      - available
+      - unavailable_reason
+      - supported_source_kinds
+      - export_supported
+      additionalProperties: false
+    Profile:
+      type: object
+      properties:
+        id: *id001
+        label:
+          type: string
+          minLength: 1
+          maxLength: 200
+        models:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 300
+          minItems: 1
+        operations:
+          type: array
+          items:
+            type: string
+            enum:
+            - embedding
+            - generation
+            - tree_selection
+            - tree_indexing
+            - reranking
+          minItems: 1
+        available: *id005
+        unavailable_reason:
+          anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 2000
+          - type: 'null'
+        max_input_tokens:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+        max_output_tokens:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+        dimensions:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+      required:
+      - id
+      - label
+      - models
+      - operations
+      - available
+      - unavailable_reason
+      - max_input_tokens
+      - max_output_tokens
+      - dimensions
+      additionalProperties: false
+    Health:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - ok
+          - degraded
+        version:
+          type: string
+          minLength: 1
+          maxLength: 200
+      required:
+      - status
+      - version
+      additionalProperties: false
+    JobAccepted:
+      type: object
+      properties:
+        job_id: *id001
+        resource_id: *id001
+      required:
+      - job_id
+      - resource_id
+      additionalProperties: false

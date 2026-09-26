@@ -1,0 +1,15 @@
+{
+  "corpus_version_id": "corpus_fixture_v1",
+  "question": "What does NEBULA-42 mean and how do I resolve it?",
+  "lanes": [
+    {
+      "config_id": "cfg_bm25_v1",
+      "bundle_id": "bundle_bm25_v1"
+    },
+    {
+      "config_id": "cfg_hybrid_rerank_v1",
+      "bundle_id": "bundle_hybrid_rerank_v1"
+    }
+  ],
+  "parent_run_id": null
+}

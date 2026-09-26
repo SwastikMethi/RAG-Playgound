@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.0.0",
+  "technique": "parent_child",
+  "chunking": {
+    "strategy": "fixed_tokens",
+    "size_tokens": 256,
+    "overlap_tokens": 32,
+    "tokenizer": "cl100k_base",
+    "tokenizer_revision": "PIN_INSTALLED_TOKENIZER_VERSION"
+  },
+  "embedding": {
+    "profile_id": "example_embedding_profile",
+    "model": "REPLACE_WITH_SUPPORTED_EMBEDDING_MODEL",
+    "dimensions": 384,
+    "document_prefix": "",
+    "query_prefix": ""
+  },
+  "search": {
+    "candidate_k": 20,
+    "context_k": 5,
+    "bm25": null,
+    "dense": {
+      "metric": "cosine",
+      "mode": "exact",
+      "hnsw_ef": null,
+      "min_score": null
+    },
+    "rrf": null
+  },
+  "reranker": null,
+  "parent": {
+    "max_parent_tokens": 1200,
+    "boundary": "source_and_page"
+  },
+  "tree": null,
+  "generation": {
+    "profile_id": "example_answer_profile",
+    "model": "REPLACE_WITH_SUPPORTED_ANSWER_MODEL",
+    "temperature": 0,
+    "max_output_tokens": 512,
+    "context_budget_tokens": 3000,
+    "prompt_id": "grounded_answer_v1",
+    "seed": null
+  },
+  "limits": {
+    "lane_timeout_ms": 90000
+  }
+}

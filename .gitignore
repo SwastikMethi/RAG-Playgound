@@ -1,0 +1,16 @@
+.DS_Store
+.env
+.venv/
+node_modules/
+dist/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.data/
+.cache/
+.superpowers/
+.worktrees/
+test-results/
+playwright-report/
+*.egg-info/
