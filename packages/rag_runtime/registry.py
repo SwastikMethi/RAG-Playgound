@@ -4,6 +4,7 @@ from importlib.metadata import version
 
 from .contracts import digest, validate
 from .errors import Problem
+from .reranker import unavailable_reason as reranker_unavailable
 
 TECHNIQUES = {
     "bm25": ("Keyword · BM25", "Ranks passages by matching words and their rarity in your corpus."),
@@ -134,8 +135,10 @@ def check_config(config: dict, profiles: dict, require_available=True):
         c = config["chunking"]
         if c["tokenizer"] != "cl100k_base" or c["tokenizer_revision"] != version("tiktoken"):
             raise Problem("UNSUPPORTED_TOKENIZER", "Choose the installed cl100k_base tokenizer revision.")
-    if config["reranker"] and require_available and not config["reranker"]["model_revision"]:
-        raise Problem("MODEL_NOT_READY", "Pin and prepare the local reranker model before use.", 409)
+    if config["reranker"]:
+        reason = reranker_unavailable(config["reranker"])
+        if reason and require_available:
+            raise Problem("MODEL_NOT_READY", reason, 409)
 
 
 def capabilities(profiles, settings):
@@ -162,7 +165,13 @@ def capabilities(profiles, settings):
                 else ["pdf", "markdown", "text", "postgres"],
                 export_supported=True,
                 default_config=config,
-                requirements=["Text-layer PDF only; at most 10 documents."] if name == "pageindex" else [],
+                requirements=(
+                    ["Text-layer PDF only; at most 10 documents."]
+                    if name == "pageindex"
+                    else ["English cross-encoder; Apache-2.0 license; 512-token scoring window."]
+                    if name == "hybrid_rerank"
+                    else []
+                ),
             )
         )
     return dict(items=result, mode=settings.mode)
@@ -179,7 +188,6 @@ def preparation_identity(config: dict, corpus_fingerprint: str, profiles: dict) 
             parent=config["parent"],
             embedding=emb,
             embedding_profile=profiles[emb["profile_id"]].fingerprint() if emb else None,
-            lexical=bool(config["search"]["bm25"]),
             tree_index=dict(
                 model=tree["index_model"],
                 profile=profiles[tree["index_profile_id"]].fingerprint(),

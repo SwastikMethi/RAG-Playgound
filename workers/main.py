@@ -2,14 +2,10 @@
 
 import asyncio
 import json
-import os
-import signal
-import sys
-import tempfile
 import time
-from pathlib import Path
+from collections import OrderedDict
+from importlib.metadata import version
 
-import psutil
 from sqlalchemy import select
 
 from app.database import Store, scoped
@@ -32,61 +28,10 @@ from rag_runtime.errors import Problem
 from rag_runtime.providers import Gateway, empty_usage, load_profiles
 from rag_runtime.registry import check_config, preparation_identity
 from rag_runtime.runtime import execute
+from rag_runtime.process import run_json
 from rag_runtime.trace import empty_timing
+from rag_runtime.vectors import Scope, VectorStore
 from .events import RunWriter
-
-
-async def subprocess_json(arguments, settings, root):
-    with tempfile.TemporaryDirectory(prefix="job-", dir=root) as temporary:
-        output_path = Path(temporary) / "result.json"
-        with output_path.open("wb") as output:
-            env = dict(os.environ, PYTHONPATH=os.pathsep.join(sys.path), HF_HUB_OFFLINE="1")
-            process = await asyncio.create_subprocess_exec(
-                sys.executable,
-                *arguments,
-                stdout=output,
-                stderr=asyncio.subprocess.DEVNULL,
-                env=env,
-                start_new_session=True,
-            )
-            started = time.monotonic()
-            try:
-                while process.returncode is None:
-                    if time.monotonic() - started > settings.parser_timeout_seconds:
-                        raise Problem(
-                            "PARSER_TIMEOUT",
-                            "Source parsing exceeded its time limit. Try a smaller document.",
-                        )
-                    try:
-                        ps = psutil.Process(process.pid)
-                        memory = ps.memory_info().rss + sum(
-                            p.memory_info().rss for p in ps.children(recursive=True)
-                        )
-                    except psutil.NoSuchProcess:
-                        memory = 0
-                    if (
-                        memory > settings.parser_memory_mb * 1024 * 1024
-                        or output_path.stat().st_size > 16 * 1024 * 1024
-                    ):
-                        raise Problem("PARSER_LIMIT", "Source parsing exceeded its memory or output limit.")
-                    try:
-                        await asyncio.wait_for(process.wait(), 0.1)
-                    except TimeoutError:
-                        pass
-            finally:
-                if process.returncode is None:
-                    os.killpg(process.pid, signal.SIGKILL)
-                    await process.wait()
-        try:
-            data = json.loads(output_path.read_text())
-        except (ValueError, OSError):
-            raise Problem("PARSER_FAILED", "The parser could not process this source.") from None
-        if "error" in data:
-            error = data["error"]
-            raise Problem(error["code"], error["message"])
-        if process.returncode:
-            raise Problem("PARSER_FAILED", "The parser exited without a complete result.")
-        return data
 
 
 class Worker:
@@ -95,8 +40,34 @@ class Worker:
         self.store = Store(settings.database_url, settings.artifact_root, settings.lease_seconds)
         self.profiles = load_profiles(settings)
         self.gateway = Gateway(settings.provider_concurrency, settings.embedding_concurrency)
+        self.vectors = None
+        self.cache = OrderedDict()
+        self.cache_bytes = 0
+
+    def vector_store(self):
+        if self.vectors is None:
+            self.vectors = VectorStore(self.settings.qdrant_url, self.settings.qdrant_collection_prefix)
+        return self.vectors
+
+    def load_prepared(self, s, artifact_id, project_id):
+        key = (project_id, artifact_id)
+        if key in self.cache:
+            value, size = self.cache.pop(key)
+            self.cache[key] = (value, size)
+            return value, "warm"
+        raw = self.store.read(s, artifact_id, project_id)
+        value = json.loads(raw)
+        while self.cache and (self.cache_bytes + len(raw) > 64 * 1024 * 1024 or len(self.cache) >= 4):
+            _, (_, size) = self.cache.popitem(last=False)
+            self.cache_bytes -= size
+        if len(raw) <= 64 * 1024 * 1024:
+            self.cache[key] = (value, len(raw))
+            self.cache_bytes += len(raw)
+        return value, "cold"
 
     def close(self):
+        if self.vectors:
+            self.vectors.close()
         self.store.engine.dispose()
 
     async def run_resource(self, resource_id):
@@ -180,8 +151,11 @@ class Worker:
                 source.source_metadata["format"],
                 source.display_name,
             )
-        parsed = await subprocess_json(
-            ["-m", "rag_runtime.parsing", str(path), kind], self.settings, self.store.root
+        parsed = await run_json(
+            ["-m", "rag_runtime.parsing", str(path), kind],
+            timeout=self.settings.parser_timeout_seconds,
+            memory_mb=self.settings.parser_memory_mb,
+            root=self.store.root,
         )
         parsed.update(source_id=claim["resource_id"], name=name)
         with self.store.session() as s:
@@ -211,6 +185,21 @@ class Worker:
                 raise Problem(
                     "PROFILE_CHANGED", "The provider profile changed after preparation was requested."
                 )
+            prior = s.scalar(
+                select(IndexBundle)
+                .where(
+                    IndexBundle.project_id == bundle.project_id,
+                    IndexBundle.corpus_version_id == corpus.id,
+                    IndexBundle.requirements_sha256 == bundle.requirements_sha256,
+                    IndexBundle.status == "ready",
+                    IndexBundle.id != bundle.id,
+                )
+                .limit(1)
+            )
+            if prior:
+                bundle.status, bundle.artifact_ids = "ready", prior.artifact_ids
+                bundle.setup_metrics = dict(prior.setup_metrics, preparation_reused=True)
+                return
             sources = [
                 json.loads(self.store.read(s, src.parsed_artifact_id, bundle.project_id))
                 for src in s.scalars(
@@ -240,7 +229,26 @@ class Worker:
                 chunks.extend(chunk_source(source, config["chunking"]))
         if not chunks or len(chunks) > 10_000:
             raise Problem("CHUNK_LIMIT", "Preparation requires 1–10,000 chunks.")
-        prepared = dict(chunks=chunks, parents=parents, scope=scope, format_version="1", recordings=[])
+        prepared = dict(
+            chunks=chunks,
+            parents=parents,
+            scope=scope,
+            format_version="1",
+            recordings=[],
+            versions=dict(bm25=version("rank-bm25"), lexical="lexical_v1", tokenizer=version("tiktoken")),
+        )
+        if config["embedding"]:
+            emb = config["embedding"]
+            vector = await self.gateway.embed(
+                self.profiles[emb["profile_id"]],
+                [emb["document_prefix"] + chunk["excerpt"] for chunk in chunks],
+            )
+            prepared["recordings"].append(vector["recording"])
+            prepared["vectors"] = vector["vectors"]
+            prepared["preparation_usage"] = vector["usage"]
+            with self.store.session() as s:
+                self.store.owned(s, claim["id"], claim["owner_token"])
+            await self.vector_store().put(Scope(**scope), chunks, vector["vectors"], emb["dimensions"])
         with self.store.session() as s:
             self.store.owned(s, claim["id"], claim["owner_token"])
             bundle = scoped(s, IndexBundle, claim["resource_id"], claim["project_id"])
@@ -309,7 +317,7 @@ class Worker:
             )
             with self.store.session() as s:
                 bundle = scoped(s, IndexBundle, lane.bundle_id, claim["project_id"])
-                prepared = json.loads(self.store.read(s, bundle.artifact_ids[0], claim["project_id"]))
+                prepared, cache_state = self.load_prepared(s, bundle.artifact_ids[0], claim["project_id"])
             async with asyncio.timeout(lane.config_snapshot["limits"]["lane_timeout_ms"] / 1000):
                 await execute(
                     question,
@@ -320,6 +328,7 @@ class Worker:
                     emit,
                     result,
                     started=started,
+                    vector_store=self.vector_store() if lane.config_snapshot["embedding"] else None,
                 )
             with self.store.session() as s:
                 self.store.owned(s, claim["id"], claim["owner_token"])
@@ -334,7 +343,7 @@ class Worker:
                 saved.provenance = dict(
                     saved.provenance,
                     artifact_ids=[*saved.provenance["artifact_ids"], artifact.id],
-                    cache_state="cold",
+                    cache_state=cache_state,
                 )
             result["metrics"]["total_ms"] = (time.monotonic() - started) * 1000
             await emit(

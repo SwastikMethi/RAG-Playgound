@@ -16,7 +16,13 @@ TOKEN = "test-token-which-is-long-and-private"
 def client(tmp_path):
     from app.main import create_app
 
-    settings = Settings(app_token=TOKEN, mode="test", database_url=TEST_URL, artifact_root=tmp_path)
+    settings = Settings(
+        app_token=TOKEN,
+        mode="test",
+        database_url=TEST_URL,
+        artifact_root=tmp_path,
+        qdrant_collection_prefix="rag_test",
+    )
     with TestClient(create_app(settings)) as c:
         c.headers["Authorization"] = f"Bearer {TOKEN}"
         yield c

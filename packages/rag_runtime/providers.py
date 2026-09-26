@@ -4,6 +4,8 @@ import os
 import asyncio
 import json
 import time
+import hashlib
+import math
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
@@ -14,7 +16,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .contracts import digest
 from .errors import Problem
-from .chunking import token_count
+from .chunking import token_count, lexical_tokens
+from .vectors import check_vectors
 
 
 class Profile(BaseModel):
@@ -158,6 +161,85 @@ class Gateway:
                 self.embedding_concurrency if operation == "embedding" else self.generation_concurrency
             )
         return self._semaphores[key]
+
+    async def embed(self, profile, inputs):
+        if profile.unavailable_reason:
+            raise Problem("MISSING_CREDENTIALS", profile.unavailable_reason)
+        counts = [token_count(text, profile.tokenizer) for text in inputs]
+        if any(count > profile.max_input_tokens for count in counts):
+            raise Problem(
+                "EMBEDDING_INPUT_LIMIT",
+                "A passage exceeds the embedding model's token limit. Choose smaller chunks.",
+            )
+        vectors, total_wait, reported_tokens = [], 0, 0
+        reported = True
+        start = 0
+        while start < len(inputs):
+            end, count = start, 0
+            while end < len(inputs) and end - start < 32 and count + counts[end] <= profile.max_input_tokens:
+                count += counts[end]
+                end += 1
+            batch = inputs[start:end]
+            for attempt in range(2):
+                began = time.monotonic()
+                async with self.semaphore(profile, "embedding"):
+                    total_wait += (time.monotonic() - began) * 1000
+                    if profile.kind == "fixture":
+                        for text in batch:
+                            vector = [0.0] * profile.dimensions
+                            for token in lexical_tokens(text) or [text]:
+                                hash = hashlib.sha256(token.encode()).digest()
+                                vector[int.from_bytes(hash[:4], "big") % profile.dimensions] += 1
+                            norm = math.sqrt(sum(v * v for v in vector))
+                            vectors.append([v / norm for v in vector])
+                        reported = False
+                        break
+                    try:
+                        async with httpx.AsyncClient(
+                            transport=self.transport, timeout=90, follow_redirects=False, trust_env=False
+                        ) as client:
+                            response = await client.post(
+                                profile.base_url.rstrip("/") + "/embeddings",
+                                headers={"Authorization": f"Bearer {profile.key}"},
+                                json=dict(model=profile.model, input=batch, encoding_format="float"),
+                            )
+                            response.raise_for_status()
+                            body = response.json()
+                            data = sorted(body["data"], key=lambda item: item["index"])
+                            if [item["index"] for item in data] != list(range(len(batch))):
+                                raise Problem(
+                                    "EMBEDDING_COUNT", "The embedding response did not match the passages."
+                                )
+                            values = [item["embedding"] for item in data]
+                            check_vectors(values, profile.dimensions)
+                            vectors.extend(values)
+                            usage = body.get("usage", {})
+                            if usage.get("total_tokens") is None:
+                                reported = False
+                            else:
+                                reported_tokens += usage["total_tokens"]
+                            break
+                    except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
+                        error = provider_error(exc)
+                        if attempt == 1 or not error.retryable:
+                            raise error from None
+                await asyncio.sleep(0.25)
+            start = end
+        return dict(
+            vectors=vectors,
+            wait_ms=total_wait,
+            usage=dict(
+                empty_usage(),
+                embedding_tokens=reported_tokens if reported else sum(counts),
+                accounting="reported" if reported else "estimated",
+            ),
+            recording=dict(
+                operation="embedding",
+                profile_fingerprint=profile.fingerprint(),
+                request_sha256=digest(inputs),
+                response=vectors,
+            ),
+        )
 
     async def stream(self, profile, generation, messages):
         if profile.kind != "fixture" and profile.unavailable_reason:

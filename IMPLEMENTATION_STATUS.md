@@ -6,7 +6,7 @@ Implementation is in progress on `codex/implement-rag-playground`. The approved 
 | --- | --- | --- |
 | M0 foundations | Verified foundation | 44 API contracts; four foundation/auth/revision tests; frontend production build |
 | M1 BM25 slice | Verified functional slice | 12 Python checks, reducer check, production build and browser upload → prepare → answer → citation → replay journey pass |
-| M2 dense/hybrid/rerank | In progress | Implementing scoped Qdrant and actual local reranking next |
+| M2 dense/hybrid/rerank | Verified functional adapters | 17 Python checks pass, including real Qdrant isolation, cross-encoder inference, parallel wall timing, preparation reuse and failure isolation |
 | M3 traces/recovery | Pending | |
 | M4 hierarchy/PageIndex | Pending | |
 | M5 PostgreSQL source | Pending | |
@@ -38,3 +38,5 @@ Full application checks, rendered UI evidence, actual reranker weights, and Page
 - M1 `npm test`: one reducer check passed for Unicode offsets, duplicate frames, sequence gaps and replay reconstruction.
 - M1 `npm run test:e2e`: one complete browser journey passed against the real API/worker/PostgreSQL, with an explicitly synthetic model provider.
 - Inspected `test-results/bm25-desktop.png` (1440px) and `test-results/bm25-mobile.png` (390px). Source and answer text are readable and there is no mobile horizontal overflow. This is provisional visual evidence: vertical density, mobile workspace controls, complete workflows, 1024px, keyboard and reduced-motion gates remain for M7/M8.
+- M2 actual cross-encoder inference passed using `cross-encoder/ms-marco-MiniLM-L6-v2@233902d25c440f23af6f7d6e94d2946bac0bee0a`, CPU, safetensors, offline loading. Public weights were downloaded explicitly; no private source data was sent for this setup.
+- Qdrant client and server are both pinned to 1.17.0 after a compatibility warning on the initially resolved client. Scoped read/delete checks pass without the warning.

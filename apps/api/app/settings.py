@@ -23,7 +23,8 @@ class Settings(BaseSettings):
     heartbeat_seconds: int = Field(5, ge=1)
     parser_timeout_seconds: int = Field(120, ge=1, le=600)
     parser_memory_mb: int = Field(2048, ge=256)
-    reranker_revision: str = ""
+    reranker_revision: str = "233902d25c440f23af6f7d6e94d2946bac0bee0a"
+    qdrant_collection_prefix: str = "rag_v1"
     web_dist: Path = Path("apps/web/dist")
 
     @field_validator("app_token")

@@ -6,6 +6,7 @@ const environment = {
   RAG_DATABASE_URL:
     "postgresql+psycopg://rag:local-development-only@127.0.0.1:6544/ragplayground_test",
   RAG_ARTIFACT_ROOT: ".data/browser-artifacts",
+  RAG_QDRANT_COLLECTION_PREFIX: "rag_browser_test",
 };
 export default defineConfig({
   testDir: "apps/web/e2e",
