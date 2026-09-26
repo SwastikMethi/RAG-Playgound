@@ -346,6 +346,45 @@
         },
         "span_truncated": {
           "type": "boolean"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "child_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "maxItems": 200
+        },
+        "matched_terms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "maxItems": 1000
+        },
+        "tree_node_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "maxItems": 12
         }
       },
       "required": [
@@ -625,6 +664,9 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 200
+        },
+        "details": {
+          "$ref": "#/$defs/StageDetails"
         }
       },
       "required": [
@@ -667,6 +709,9 @@
         "resource_wait_ms": {
           "type": "number",
           "minimum": 0
+        },
+        "details": {
+          "$ref": "#/$defs/StageDetails"
         }
       },
       "required": [
@@ -909,6 +954,10 @@
                     "type": "null"
                   }
                 ]
+              },
+              "title": {
+                "type": "string",
+                "maxLength": 1000
               }
             },
             "required": [
@@ -1287,6 +1336,56 @@
         "status",
         "lane_ids"
       ],
+      "additionalProperties": false
+    },
+    "StageDetails": {
+      "type": "object",
+      "properties": {
+        "input_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "output_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "query_terms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "maxItems": 1000
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "dimensions": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "selected_document_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "maxItems": 3
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      },
       "additionalProperties": false
     }
   },

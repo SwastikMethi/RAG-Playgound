@@ -4,8 +4,8 @@ Implementation is in progress on `codex/implement-rag-playground`. The approved 
 
 | Milestone | State | Evidence |
 | --- | --- | --- |
-| M0 foundations | In progress | Pack reviewed; validator compatibility bug reproduced; Docker available |
-| M1 BM25 slice | Pending | |
+| M0 foundations | Verified foundation | 44 API contracts; four foundation/auth/revision tests; frontend production build |
+| M1 BM25 slice | In progress | Six real parsing/chunking/retrieval tests pass, including Docling PDF pages; complete journey pending |
 | M2 dense/hybrid/rerank | Pending | |
 | M3 traces/recovery | Pending | |
 | M4 hierarchy/PageIndex | Pending | |
@@ -27,4 +27,10 @@ All 16 original implementation documents, six configuration examples, 45 trace e
 
 ## Verification still required
 
-Application checks, rendered UI evidence, actual reranker weights, and PageIndex indexing remain unverified until recorded below. No real model-provider calls have been made.
+Full application checks, rendered UI evidence, actual reranker weights, and PageIndex indexing remain unverified until recorded below. No real model-provider calls have been made. PageIndex 0.2.19 public local indexing/tree/page APIs were inspected successfully; this is not a live indexing result.
+
+## Recorded checks
+
+- `.venv/bin/python -m pytest tests/unit/test_contracts.py tests/integration/test_foundations.py tests/integration/test_api.py -q`: 4 passed, using dedicated PostgreSQL test database.
+- `.venv/bin/python -m pytest tests/unit/test_runtime.py -q`: 6 passed, real BM25, tokenization and Docling PDF conversion. Model asset initialization took roughly two minutes.
+- `npm run generate:types` and `npm run build`: passed. Host Node 25 was used; supported Node 22 container validation remains pending.

@@ -1,0 +1,21 @@
+profiles:
+  - id: answers
+    label: Answer model
+    model: REPLACE_WITH_MODEL_ID
+    operations: [generation, tree_selection, tree_indexing]
+    base_url: https://YOUR-APPROVED-ENDPOINT/v1
+    api_key_env: RAG_MODEL_API_KEY
+    max_input_tokens: 8192
+    max_output_tokens: 2048
+    tokenizer: cl100k_base
+    supports_temperature: true
+    supports_seed: false
+  - id: embeddings
+    label: Embedding model
+    model: REPLACE_WITH_EMBEDDING_MODEL_ID
+    operations: [embedding]
+    base_url: https://YOUR-APPROVED-ENDPOINT/v1
+    api_key_env: RAG_MODEL_API_KEY
+    max_input_tokens: 8192
+    dimensions: 1536
+    tokenizer: cl100k_base

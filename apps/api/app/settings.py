@@ -1,0 +1,34 @@
+from pathlib import Path
+from typing import Literal
+
+from pydantic import Field, SecretStr, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="RAG_", env_file=".env", extra="ignore")
+    app_token: SecretStr
+    mode: Literal["live", "fixture", "test"] = "live"
+    database_url: str = "postgresql+psycopg://rag:local-development-only@127.0.0.1:6544/ragplayground"
+    qdrant_url: str = "http://127.0.0.1:6344"
+    artifact_root: Path = Path(".data/artifacts")
+    profiles_path: Path = Path("config/profiles.yaml")
+    master_key: SecretStr = SecretStr("")
+    database_host_allowlist: list[str] = []
+    provider_host_allowlist: list[str] = []
+    max_compare_runs: int = Field(2, ge=1, le=2)
+    provider_concurrency: int = Field(4, ge=1, le=16)
+    embedding_concurrency: int = Field(4, ge=1, le=16)
+    lease_seconds: int = Field(30, ge=10)
+    heartbeat_seconds: int = Field(5, ge=1)
+    parser_timeout_seconds: int = Field(120, ge=1, le=600)
+    parser_memory_mb: int = Field(2048, ge=256)
+    reranker_revision: str = ""
+    web_dist: Path = Path("apps/web/dist")
+
+    @field_validator("app_token")
+    @classmethod
+    def token_length(cls, value):
+        if len(value.get_secret_value()) < 24:
+            raise ValueError("Set RAG_APP_TOKEN to at least 24 random characters.")
+        return value

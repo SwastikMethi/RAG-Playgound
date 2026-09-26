@@ -1,0 +1,5 @@
+services:
+  postgres:
+    ports: ["127.0.0.1:6544:5432"]
+  qdrant:
+    ports: ["127.0.0.1:6344:6333"]

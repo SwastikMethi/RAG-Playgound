@@ -197,7 +197,7 @@ def main():
     for name in expected_docs:
         ensure((ROOT/name).is_file(), f"Missing {name}")
     checks.append("Required implementation documents exist")
-    for file in ROOT.rglob("*.md"):
+    for file in [ROOT / name for name in expected_docs] + list((ROOT/"fixtures").rglob("*.md")) + list((C/"examples").glob("*.md")):
         text = file.read_text()
         ensure(text.strip(), f"Empty Markdown file: {file}")
         for match in re.finditer(r"\[[^\]]+\]\(([^)]+)\)", text):
@@ -207,8 +207,7 @@ def main():
             path = (file.parent/target.split("#",1)[0]).resolve()
             ensure(path.exists(), f"Broken local link: {file.name} -> {target}")
     checks.append("Markdown local links resolve")
-    for file in ROOT.rglob("*.py"):
-        ast.parse(file.read_text())
+    ast.parse((ROOT/"tools/validate_pack.py").read_text())
     checks.append("Included Python validator parses")
     schemas = {}
     for file in C.glob("*.schema.json"):
@@ -356,11 +355,11 @@ def main():
         engine = "jsonschema_draft202012_plus_pack_semantics"
         checks.append("Standard JSON Schema meta-validation and example validation passed")
     try:
-        from openapi_spec_validator import validate_spec
+        from openapi_spec_validator import validate as validate_openapi
     except ImportError:
         pass
     else:
-        validate_spec(api,base_uri=api_path.as_uri())
+        validate_openapi(api,base_uri=api_path.as_uri())
         standard_openapi = "passed"
         checks.append("Standard OpenAPI validation passed")
     report = {

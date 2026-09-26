@@ -3,8 +3,8 @@ jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: RAG Playground API
   version: 1.0.0
-  description: Single-owner playground API. This is an implementation contract, not a running service.
-    All private resources require bearer authorization.
+  description: Single-owner playground API. This is an implementation contract, not
+    a running service. All private resources require bearer authorization.
 servers:
 - url: /api/v1
 security:
@@ -1790,6 +1790,24 @@ paths:
         schema: *id001
       - *id002
       - *id003
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 8000
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - queued
+          - running
+          - completed
+          - partial
+          - failed
+          - cancelled
   /runs/{run_id}:
     get:
       operationId: getRun
@@ -1904,8 +1922,8 @@ paths:
           x-event-schema:
             $ref: ./trace-event.schema.json
       description: SSE event name trace, id run_id:seq, JSON data conforming to trace-event.schema.json.
-        Cursor values must agree when both forms are supplied. Heartbeat every 15 seconds; closes after
-        terminal event.
+        Cursor values must agree when both forms are supplied. Heartbeat every 15
+        seconds; closes after terminal event.
       parameters:
       - name: run_id
         in: path
@@ -2491,8 +2509,15 @@ paths:
                     items:
                       $ref: '#/components/schemas/Capability'
                     minItems: 0
+                  mode:
+                    type: string
+                    enum:
+                    - live
+                    - fixture
+                    - test
                 required:
                 - items
+                - mode
                 additionalProperties: false
   /system/profiles:
     get:
@@ -2614,6 +2639,251 @@ paths:
         in: path
         required: true
         schema: *id001
+  /system/readiness:
+    get:
+      operationId: getReadiness
+      summary: Check required storage readiness
+      parameters: []
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /jobs/{job_id}/cancel:
+    post:
+      operationId: cancelJob
+      summary: Request safe cancellation of background work
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema: &id004
+          type: string
+          minLength: 1
+          maxLength: 128
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '202':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+  /connections/{connection_id}/preview:
+    post:
+      operationId: previewPostgres
+      summary: Preview at most five approved text records
+      parameters:
+      - name: connection_id
+        in: path
+        required: true
+        schema: *id004
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresPreview'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CapturePostgres'
+  /runs/{run_id}/lanes/{lane_id}/artifacts/{artifact_id}:
+    get:
+      operationId: getTraceArtifact
+      summary: Read recorded step details belonging to this lane
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema: *id004
+      - name: lane_id
+        in: path
+        required: true
+        schema: *id004
+      - name: artifact_id
+        in: path
+        required: true
+        schema: *id004
+      responses:
+        '400':
+          description: Malformed request or cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict or unavailable resource state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or capability failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Capacity or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceArtifact'
 components:
   securitySchemes:
     ownerToken:
@@ -2632,7 +2902,7 @@ components:
           type: string
           minLength: 1
           maxLength: 2000
-        retryable: &id005
+        retryable: &id006
           type: boolean
         details:
           type: object
@@ -2663,10 +2933,10 @@ components:
           type: string
           minLength: 1
           maxLength: 120
-        created_at: &id004
+        created_at: &id005
           type: string
           format: date-time
-        updated_at: *id004
+        updated_at: *id005
       required:
       - id
       - name
@@ -2705,14 +2975,14 @@ components:
           - succeeded
           - failed
           - cancelled
-        created_at: *id004
+        created_at: *id005
         started_at:
           anyOf:
-          - *id004
+          - *id005
           - type: 'null'
         completed_at:
           anyOf:
-          - *id004
+          - *id005
           - type: 'null'
         progress:
           type: object
@@ -2756,7 +3026,7 @@ components:
           - deleted
         content_sha256:
           anyOf:
-          - &id006
+          - &id007
             type: string
             pattern: ^[a-f0-9]{64}$
           - type: 'null'
@@ -2771,7 +3041,7 @@ components:
           anyOf:
           - *id001
           - type: 'null'
-        created_at: *id004
+        created_at: *id005
         error:
           anyOf:
           - $ref: '#/components/schemas/Error'
@@ -2863,7 +3133,7 @@ components:
           - relation
           - record_key
           additionalProperties: false
-        truncated: *id005
+        truncated: *id006
       required:
       - source_id
       - content
@@ -2952,7 +3222,7 @@ components:
             maxLength: 200
           minItems: 1
           maxItems: 20
-        created_at: *id004
+        created_at: *id005
       required:
       - id
       - project_id
@@ -3047,8 +3317,8 @@ components:
                 type: string
                 minLength: 1
                 maxLength: 200
-              nullable: *id005
-              selectable: *id005
+              nullable: *id006
+              selectable: *id006
             required:
             - name
             - data_type
@@ -3147,10 +3417,10 @@ components:
           items: *id001
           minItems: 1
           maxItems: 20
-        content_fingerprint: *id006
+        content_fingerprint: *id007
         status:
           const: ready
-        created_at: *id004
+        created_at: *id005
       required:
       - id
       - project_id
@@ -3192,8 +3462,8 @@ components:
           minimum: 1
         config:
           $ref: ./pipeline.schema.json
-        config_sha256: *id006
-        created_at: *id004
+        config_sha256: *id007
+        created_at: *id005
       required:
       - id
       - family_id
@@ -3231,13 +3501,13 @@ components:
           anyOf:
           - *id001
           - type: 'null'
-        requirements_sha256: *id006
+        requirements_sha256: *id007
         preparation_ms:
           anyOf:
           - type: number
             minimum: 0
           - type: 'null'
-        preparation_reused: *id005
+        preparation_reused: *id006
         warnings:
           type: array
           items:
@@ -3303,22 +3573,22 @@ components:
           type: string
           minLength: 1
           maxLength: 200
-        prompt_sha256: *id006
+        prompt_sha256: *id007
         profile_fingerprints:
           type: object
           properties:
-            generation: *id006
+            generation: *id007
             embedding:
               anyOf:
-              - *id006
+              - *id007
               - type: 'null'
             tree_indexing:
               anyOf:
-              - *id006
+              - *id007
               - type: 'null'
             tree_selection:
               anyOf:
-              - *id006
+              - *id007
               - type: 'null'
           required:
           - generation
@@ -3420,7 +3690,7 @@ components:
           $ref: '#/components/schemas/Provenance'
         technique:
           type: string
-          enum: &id007
+          enum: &id008
           - bm25
           - dense
           - hybrid
@@ -3462,6 +3732,8 @@ components:
           anyOf:
           - $ref: '#/components/schemas/Error'
           - type: 'null'
+        feedback:
+          $ref: '#/components/schemas/Feedback'
       required:
       - id
       - config_id
@@ -3500,14 +3772,14 @@ components:
           - partial
           - failed
           - cancelled
-        created_at: *id004
+        created_at: *id005
         started_at:
           anyOf:
-          - *id004
+          - *id005
           - type: 'null'
         completed_at:
           anyOf:
-          - *id004
+          - *id005
           - type: 'null'
         last_seq:
           type: integer
@@ -3523,6 +3795,8 @@ components:
             $ref: '#/components/schemas/Lane'
           minItems: 1
           maxItems: 6
+        preference:
+          $ref: '#/components/schemas/Preference'
       required:
       - id
       - project_id
@@ -3545,7 +3819,7 @@ components:
           anyOf:
           - *id001
           - type: 'null'
-        cancel_requested: *id005
+        cancel_requested: *id006
       required:
       - run_id
       - lane_id
@@ -3636,7 +3910,7 @@ components:
           - building
           - ready
           - failed
-        include_data: *id005
+        include_data: *id006
         job_id:
           anyOf:
           - *id001
@@ -3672,7 +3946,7 @@ components:
       properties:
         technique:
           type: string
-          enum: *id007
+          enum: *id008
         display_name:
           type: string
           minLength: 1
@@ -3681,7 +3955,7 @@ components:
           type: string
           minLength: 1
           maxLength: 2000
-        available: *id005
+        available: *id006
         unavailable_reason:
           anyOf:
           - type: string
@@ -3698,7 +3972,16 @@ components:
             - text
             - postgres
           minItems: 0
-        export_supported: *id005
+        export_supported: *id006
+        default_config:
+          anyOf:
+          - $ref: ./pipeline.schema.json
+          - type: 'null'
+        requirements:
+          type: array
+          items:
+            type: string
+          maxItems: 10
       required:
       - technique
       - display_name
@@ -3734,7 +4017,7 @@ components:
             - tree_indexing
             - reranking
           minItems: 1
-        available: *id005
+        available: *id006
         unavailable_reason:
           anyOf:
           - type: string
@@ -3791,4 +4074,44 @@ components:
       required:
       - job_id
       - resource_id
+      additionalProperties: false
+    PostgresPreview:
+      type: object
+      properties:
+        rows:
+          type: array
+          maxItems: 5
+          items:
+            type: object
+            properties:
+              key:
+                type: object
+              text:
+                type: string
+                maxLength: 8000
+            required:
+            - key
+            - text
+            additionalProperties: false
+        truncated:
+          type: boolean
+        ordering:
+          type: string
+      required:
+      - rows
+      - truncated
+      - ordering
+      additionalProperties: false
+    TraceArtifact:
+      type: object
+      properties:
+        id: *id004
+        kind:
+          const: step_details
+        data:
+          type: object
+      required:
+      - id
+      - kind
+      - data
       additionalProperties: false

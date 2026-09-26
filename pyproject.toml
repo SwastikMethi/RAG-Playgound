@@ -26,6 +26,12 @@ dev = ["pytest>=8,<10", "pytest-asyncio>=0.25,<2", "openapi-spec-validator>=0.9,
 [tool.hatch.build.targets.wheel]
 packages = ["packages/rag_runtime", "apps/api/app", "workers"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"contracts/pipeline.schema.json" = "rag_runtime/contracts/pipeline.schema.json"
+"contracts/trace-event.schema.json" = "rag_runtime/contracts/trace-event.schema.json"
+"contracts/export-manifest.schema.json" = "rag_runtime/contracts/export-manifest.schema.json"
+"contracts/openapi.yaml" = "rag_runtime/contracts/openapi.yaml"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["packages", "apps/api", "."]
