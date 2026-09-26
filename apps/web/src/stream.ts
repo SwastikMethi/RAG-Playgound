@@ -23,9 +23,10 @@ export async function streamEvents(
   try {
     while (true) {
       const { value, done } = await reader.read();
-      buffer += decoder
-        .decode(value, { stream: !done })
-        .replaceAll("\r\n", "\n");
+      buffer = (buffer + decoder.decode(value, { stream: !done })).replaceAll(
+        "\r\n",
+        "\n",
+      );
       let end;
       while ((end = buffer.indexOf("\n\n")) >= 0) {
         const frame = buffer.slice(0, end);

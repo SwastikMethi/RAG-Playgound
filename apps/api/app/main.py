@@ -16,6 +16,7 @@ from rag_runtime.registry import capabilities, check_config
 from .database import Store, scoped
 from .content import router as content_router
 from .runs import router as runs_router
+from .cancellation import router as cancellation_router
 from .models import Configuration, Project
 from .present import present
 from .settings import Settings
@@ -174,6 +175,7 @@ def create_app(settings=None):
 
     app.include_router(content_router)
     app.include_router(runs_router)
+    app.include_router(cancellation_router)
     app.mount(
         "/",
         StaticFiles(

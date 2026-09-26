@@ -31,7 +31,7 @@ def schema_file(name):
 
 
 @lru_cache
-def validator(name, component=None):
+def validator(name, component=None, pointer=None):
     registry = Registry()
     for filename in (
         "pipeline.schema.json",
@@ -46,6 +46,8 @@ def validator(name, component=None):
     target = (CONTRACT_ROOT / name).as_uri()
     if component:
         target += "#/components/schemas/" + component
+    elif pointer:
+        target += "#" + pointer
     return Draft202012Validator({"$ref": target}, registry=registry, format_checker=FormatChecker())
 
 

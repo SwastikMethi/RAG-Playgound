@@ -59,6 +59,13 @@ class Store:
             )
             if active >= compare_limit:
                 query = query.where(Job.kind != "compare_run")
+            active_kinds = list(
+                s.scalars(
+                    select(Job.kind).where(Job.status == "running", Job.kind != "compare_run").distinct()
+                )
+            )
+            if active_kinds:
+                query = query.where(Job.kind.not_in(active_kinds))
             job = s.scalar(query.order_by(Job.created_at, Job.id).with_for_update(skip_locked=True).limit(1))
             if not job:
                 return None

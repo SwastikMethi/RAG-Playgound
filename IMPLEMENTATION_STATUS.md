@@ -7,7 +7,7 @@ Implementation is in progress on `codex/implement-rag-playground`. The approved 
 | M0 foundations | Verified foundation | 44 API contracts; four foundation/auth/revision tests; frontend production build |
 | M1 BM25 slice | Verified functional slice | 12 Python checks, reducer check, production build and browser upload → prepare → answer → citation → replay journey pass |
 | M2 dense/hybrid/rerank | Verified functional adapters | 17 Python checks pass, including real Qdrant isolation, cross-encoder inference, parallel wall timing, preparation reuse and failure isolation |
-| M3 traces/recovery | Pending | |
+| M3 traces/recovery | Verified event and recovery path | 25 Python checks, 3 frontend checks; fixed workflow graphs and step inspector; persisted replay, Unicode/citation integrity, cancellation, deadlines and worker fencing |
 | M4 hierarchy/PageIndex | Pending | |
 | M5 PostgreSQL source | Pending | |
 | M6 export | Pending | |
@@ -27,7 +27,7 @@ All 16 original implementation documents, six configuration examples, 45 trace e
 
 ## Verification still required
 
-Full application checks, rendered UI evidence, actual reranker weights, and PageIndex indexing remain unverified until recorded below. No real model-provider calls have been made. PageIndex 0.2.19 public local indexing/tree/page APIs were inspected successfully; this is not a live indexing result.
+Release-wide checks and full rendered state coverage remain pending. Actual reranker weights and inference are verified below; live PageIndex indexing is not yet verified. No real model-provider calls have been made. PageIndex 0.2.19 public local indexing/tree/page APIs were inspected successfully; this is not a live indexing result.
 
 ## Recorded checks
 

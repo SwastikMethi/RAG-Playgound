@@ -51,3 +51,47 @@ describe("the live and replay reducer", () => {
     expect(reloaded).toEqual(state);
   });
 });
+
+it("verifies citation labels as well as hashes and rebuilds earlier replay state", async () => {
+  const { replay } = await import("./reducer");
+  const text = "A🪐 [E1] [E9]";
+  const hash = Array.from(
+    new Uint8Array(
+      await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)),
+    ),
+    (x) => x.toString(16).padStart(2, "0"),
+  ).join("");
+  const frames = [
+    event(1, "run.started", { lane_ids: ["lane"], queue_ms: 0 }, null),
+    event(2, "lane.started", {}),
+    event(3, "context.selected", { evidence: [{ label: "E1" }] }),
+    event(4, "answer.delta", { offset_chars: 0, text }),
+    event(5, "answer.completed", {
+      text_sha256: hash,
+      valid_citation_labels: ["E1"],
+      invalid_citation_labels: ["E9"],
+    }),
+    event(6, "lane.completed", { metrics: { total_ms: 6 } }),
+    event(7, "run.completed", { status: "completed" }, null),
+  ];
+  const final = await replay("run", frames);
+  expect(final.resync).toBe(false);
+  expect((await replay("run", frames, 3)).lanes.lane.answer).toBe("");
+  const bad = await reduceEvent(
+    await replay("run", frames, 4),
+    event(5, "answer.completed", {
+      text_sha256: hash,
+      valid_citation_labels: ["E9"],
+      invalid_citation_labels: [],
+    }),
+  );
+  expect(bad.resync).toBe(true);
+  expect(
+    (
+      await reduceEvent(
+        final,
+        event(8, "answer.delta", { offset_chars: 13, text: "late" }),
+      )
+    ).resync,
+  ).toBe(true);
+});

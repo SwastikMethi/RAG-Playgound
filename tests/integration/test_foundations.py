@@ -33,6 +33,9 @@ def test_claim_is_exclusive_and_old_owner_is_fenced():
     with pytest.raises(Problem, match="lease"):
         store.heartbeat(job_id, "wrong-owner")
     assert store.heartbeat(job_id, claimed[0]["owner_token"])
+    with store.session() as s:
+        s.get(Job, job_id).status = "succeeded"
+    store.engine.dispose()
 
 
 def test_profile_secrets_are_not_public_and_fixture_is_explicit(tmp_path, monkeypatch):

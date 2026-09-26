@@ -28,12 +28,14 @@ class Span:
 
 
 class Trace:
-    def __init__(self, emit: Emit):
+    def __init__(self, emit: Emit, metrics=None, clock=time.monotonic):
         self.emit = emit
+        self.metrics = metrics
+        self.clock = clock
 
     @asynccontextmanager
     async def span(self, stage: str, parent=None, details=None, attempt=1):
-        span = Span(uuid4().hex, stage, time.monotonic())
+        span = Span(uuid4().hex, stage, self.clock())
         await self.emit(
             "stage.started",
             dict(
@@ -48,6 +50,7 @@ class Trace:
         try:
             yield span
         except BaseException as exc:
+            span.duration_ms = (self.clock() - span.started) * 1000
             error = (
                 exc
                 if isinstance(exc, Problem)
@@ -63,13 +66,13 @@ class Trace:
                 dict(
                     span_id=span.id,
                     stage=stage,
-                    duration_ms=(time.monotonic() - span.started) * 1000,
+                    duration_ms=span.duration_ms,
                     error=error.public(),
                 ),
             )
             raise
         else:
-            span.duration_ms = (time.monotonic() - span.started) * 1000
+            span.duration_ms = (self.clock() - span.started) * 1000
             await self.emit(
                 "stage.completed",
                 dict(
@@ -80,3 +83,11 @@ class Trace:
                     details=span.details,
                 ),
             )
+        finally:
+            key = {
+                "retrieval": "retrieval_ms",
+                "context_packing": "context_ms",
+                "generation": "generation_ms",
+            }.get(stage)
+            if key and self.metrics is not None:
+                self.metrics[key] = span.duration_ms

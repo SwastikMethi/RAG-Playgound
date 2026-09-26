@@ -2,10 +2,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.settings import Settings
-from rag_runtime.contracts import validate
+from rag_runtime.contracts import validate, validator, schema_file
 from tests.conftest import TEST_URL
 import asyncio
 import json
+import re
+from urllib.parse import urlsplit
 from uuid import uuid4
 
 pytestmark = pytest.mark.integration
@@ -25,6 +27,24 @@ def client(tmp_path):
     )
     with TestClient(create_app(settings)) as c:
         c.headers["Authorization"] = f"Bearer {TOKEN}"
+        send = c.request
+        def checked(method, url, *args, **kwargs):
+            response = send(method, url, *args, **kwargs)
+            path = urlsplit(str(url)).path.removeprefix('/api/v1')
+            for template, operations in schema_file('openapi.yaml')['paths'].items():
+                if not re.fullmatch(re.sub(r'\{[^}]+\}', '[^/]+', template), path):
+                    continue
+                operation = operations.get(method.lower())
+                if not operation:
+                    break
+                status = str(response.status_code)
+                assert status in operation['responses'], f'{method} {path}: undeclared status {status}'
+                if 'application/json' in response.headers.get('content-type', ''):
+                    escaped = template.replace('~','~0').replace('/','~1')
+                    validator('openapi.yaml', pointer=f'/paths/{escaped}/{method.lower()}/responses/{status}/content/application~1json/schema').validate(response.json())
+                break
+            return response
+        c.request = checked
         yield c
 
 

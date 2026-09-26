@@ -51,6 +51,13 @@ test("upload, prepare, answer, inspect evidence and replay", async ({
     page.getByRole("complementary", { name: "Source evidence" }),
   ).toContainText("NEBULA-42 means clock drift");
   await page.getByRole("button", { name: "Close inspector" }).click();
+  await page.getByRole("button", { name: "workflow", exact: true }).click();
+  await page.locator('.step-list button').filter({hasText:'Keyword search'}).click();
+  await expect(page.getByRole('complementary',{name:'Execution step'})).toContainText('Purpose');
+  await expect(page.getByRole('complementary',{name:'Execution step'})).toContainText('Measured duration');
+  await page.screenshot({path:'test-results/workflow-desktop.png',fullPage:true});
+  await page.getByRole('button',{name:'Close inspector'}).click();
+  await page.getByRole('button',{name:'answer',exact:true}).click();
   await page.screenshot({
     path: "test-results/bm25-desktop.png",
     fullPage: true,

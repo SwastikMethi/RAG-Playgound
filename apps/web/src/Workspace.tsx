@@ -40,11 +40,13 @@ import {
   type TraceEvent,
 } from "./reducer";
 import { streamEvents } from "./stream";
+import { Workflow, StepInspector, LiveDuration } from "./Workflow";
 
 type View = "playground" | "sources" | "history";
 type Inspection =
   | { kind: "source"; source: Source }
   | { kind: "evidence"; evidence: Evidence }
+  | { kind: "step"; laneId: string; spanId: string }
   | { kind: "settings"; config: Configuration };
 const ms = (n: number | null | undefined) =>
   n == null
@@ -82,11 +84,50 @@ export function Workspace({
   const [playback, setPlayback] = useState<Playback | null>(null),
     [connected, setConnected] = useState(false),
     [mobileLane, setMobileLane] = useState(0);
-  const [inspection, setInspection] = useState<Inspection | null>(null);
+  const [inspection, updateInspection] = useState<Inspection | null>(null);
+  const [followLane, setFollowLane] = useState<string | null>(null);
+  const setInspection = useCallback((value: Inspection | null) => {
+    setFollowLane(null);
+    updateInspection(value);
+  }, []);
+  const [tabs, setTabs] = useState<Record<string, string>>({});
+  const [playing, setPlaying] = useState(false),
+    [speed, setSpeed] = useState(1),
+    [compressed, setCompressed] = useState(false);
+  const seekRequest = useRef(0);
   const [events, setEvents] = useState<TraceEvent[]>([]),
     [replaying, setReplaying] = useState(false),
     [cursor, setCursor] = useState(0);
   const savedEvents = useRef<TraceEvent[]>([]);
+  useEffect(() => {
+    if (!followLane || !playback) return;
+    const last = Object.values(playback.lanes[followLane]?.stages || {}).at(-1);
+    if (last)
+      updateInspection({ kind: "step", laneId: followLane, spanId: last.id });
+  }, [followLane, playback]);
+  useEffect(() => {
+    setPlaying(false);
+    setFollowLane(null);
+    setTabs({});
+    setSpeed(Number(sessionStorage.getItem(`replay-speed:${run?.id}`) || 1));
+  }, [run?.id]);
+  useEffect(() => {
+    if (!playing || !run) return;
+    if (cursor >= events.length) {
+      setPlaying(false);
+      return;
+    }
+    const gap =
+      events[cursor].elapsed_ms - (events[cursor - 1]?.elapsed_ms || 0);
+    const delay = (compressed ? Math.min(gap, 1000) : gap) / speed;
+    const timer = setTimeout(
+      () => {
+        void seek(cursor + 1);
+      },
+      Math.max(0, delay),
+    );
+    return () => clearTimeout(timer);
+  }, [playing, cursor, events, speed, compressed, run?.id]);
   const corpus = corpora.find((c) => c.id === corpusId);
   const selectedConfigs = selected
     .map((id) => configs.find((c) => c.id === id))
@@ -192,6 +233,18 @@ export function Workspace({
             const latest = await api<Run>(`/runs/${run!.id}`);
             if (!controller.signal.aborted)
               setRun((prior) => (prior?.id === latest.id ? latest : prior));
+            const savedCursor = sessionStorage.getItem(
+              `replay-cursor:${run!.id}`,
+            );
+            if (savedCursor !== null && !controller.signal.aborted) {
+              const seq = Math.min(
+                savedEvents.current.length,
+                Math.max(0, Number(savedCursor) || 0),
+              );
+              setCursor(seq);
+              setReplaying(true);
+              setPlayback(await replay(run!.id, savedEvents.current, seq));
+            }
             return;
           }
         } catch (e) {
@@ -302,9 +355,18 @@ export function Workspace({
   }
   async function seek(seq: number) {
     if (!run) return;
+    const request = ++seekRequest.current;
+    setFollowLane(null);
     setReplaying(true);
+    let next = playback;
+    if (replaying && next && seq >= next.lastSeq) {
+      for (const event of events.slice(next.lastSeq, seq))
+        next = await reduceEvent(next, event);
+    } else next = await replay(run.id, events, seq);
+    if (request !== seekRequest.current) return;
     setCursor(seq);
-    setPlayback(await replay(run.id, events, seq));
+    setPlayback(next);
+    sessionStorage.setItem(`replay-cursor:${run.id}`, String(seq));
   }
   const ready =
     !!corpus &&
@@ -623,9 +685,34 @@ export function Workspace({
                     </span>
                   </div>
                   <Status value={playback?.status || run.status} />
+                  {active && (
+                    <Button
+                      tone="danger"
+                      onClick={() =>
+                        action(async () => {
+                          await post(`/runs/${run.id}/cancel`, undefined);
+                        })
+                      }
+                    >
+                      Stop all
+                    </Button>
+                  )}
                 </div>
                 {terminal(run.status) && events.length > 0 && (
                   <div className="replay-bar">
+                    <Button
+                      onClick={async () => {
+                        if (playing) {
+                          setPlaying(false);
+                          return;
+                        }
+                        if (!replaying || cursor >= events.length)
+                          await seek(0);
+                        setPlaying(true);
+                      }}
+                    >
+                      {playing ? "Pause" : "Play replay"}
+                    </Button>
                     <Button
                       onClick={() =>
                         seek(
@@ -658,14 +745,49 @@ export function Workspace({
                       value={replaying ? cursor : events.length}
                       onChange={(e) => seek(Number(e.target.value))}
                     />
+                    <select
+                      aria-label="Replay speed"
+                      value={speed}
+                      onChange={(e) => {
+                        setSpeed(Number(e.target.value));
+                        sessionStorage.setItem(
+                          `replay-speed:${run.id}`,
+                          e.target.value,
+                        );
+                      }}
+                    >
+                      {[0.5, 1, 2, 4].map((n) => (
+                        <option key={n} value={n}>
+                          {n}×
+                        </option>
+                      ))}
+                    </select>
+                    <label className="inline-check">
+                      <input
+                        type="checkbox"
+                        checked={compressed}
+                        onChange={(e) => setCompressed(e.target.checked)}
+                      />
+                      Compress long waits
+                    </label>
                     <Button
                       onClick={async () => {
+                        setPlaying(false);
+                        seekRequest.current++;
                         setPlayback(await replay(run.id, events));
                         setReplaying(false);
                       }}
                     >
                       Show final answer
                     </Button>
+                    <span className="caption replay-time">
+                      {compressed ? "Compressed playback · " : ""}Recorded
+                      elapsed:{" "}
+                      {ms(
+                        events[(replaying ? cursor : events.length) - 1]
+                          ?.elapsed_ms,
+                      )}
+                    </span>
                   </div>
                 )}
                 <label className="mobile-lane-select">
@@ -708,7 +830,15 @@ export function Workspace({
                         <div className="lane-tools">
                           <span>
                             Total{" "}
-                            <strong>{ms(state?.metrics?.total_ms)}</strong>
+                            <LiveDuration
+                              state={state}
+                              elapsed={
+                                events[(replaying ? cursor : events.length) - 1]
+                                  ?.elapsed_ms || 0
+                              }
+                              connected={connected}
+                              replaying={replaying}
+                            />
                           </span>
                           <span>
                             First token{" "}
@@ -724,85 +854,184 @@ export function Workspace({
                               <Settings2 size={15} />
                             </Button>
                           )}
-                        </div>
-                        <div className="answer-text">
-                          {state?.answer ? (
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
-                              components={{
-                                img: () => null,
-                                a: ({ href, children }) =>
-                                  href?.startsWith("#evidence-") ? (
-                                    <button
-                                      className="citation"
-                                      onClick={() => {
-                                        const e = state.evidence.find(
-                                          (e) => e.label === href.slice(10),
-                                        );
-                                        if (e)
-                                          setInspection({
-                                            kind: "evidence",
-                                            evidence: e,
-                                          });
-                                      }}
-                                    >
-                                      {children}
-                                    </button>
-                                  ) : (
-                                    <span>{children}</span>
-                                  ),
-                              }}
-                            >
-                              {state.answer.replace(
-                                /\[(E[1-9][0-9]*)\]/g,
-                                "[$1](#evidence-$1)",
-                              )}
-                            </ReactMarkdown>
-                          ) : (
-                            <p className="muted">
-                              {state?.status === "running"
-                                ? "Retrieving evidence…"
-                                : "Waiting for this lane."}
-                            </p>
-                          )}
-                          {state?.error && (
-                            <ErrorNotice message={state.error} />
-                          )}
-                        </div>
-                        <div className="lane-evidence">
-                          {state?.evidence.map((e) => (
-                            <button
-                              key={e.evidence_id}
+                          {!terminal(state?.status || "queued") && (
+                            <Button
+                              tone="danger"
                               onClick={() =>
-                                setInspection({ kind: "evidence", evidence: e })
+                                action(async () => {
+                                  await post(
+                                    `/runs/${run.id}/lanes/${lane.id}/cancel`,
+                                    undefined,
+                                  );
+                                })
                               }
                             >
-                              <span>{e.label}</span>
-                              {e.source_name}
-                              <ChevronRight size={14} />
+                              Stop
+                            </Button>
+                          )}
+                        </div>
+                        <div
+                          className="lane-tabs"
+                          role="group"
+                          aria-label="Lane view"
+                        >
+                          {["answer", "workflow", "evidence"].map((tab) => (
+                            <button
+                              key={tab}
+                              aria-pressed={(tabs[lane.id] || "answer") === tab}
+                              onClick={() =>
+                                setTabs((prior) => ({
+                                  ...prior,
+                                  [lane.id]: tab,
+                                }))
+                              }
+                            >
+                              {tab}
                             </button>
                           ))}
                         </div>
-                        <details className="lane-details">
-                          <summary>
-                            Execution steps ·{" "}
-                            {Object.keys(state?.stages || {}).length}
-                          </summary>
-                          <ol>
-                            {Object.values(state?.stages || {}).map((step) => (
-                              <li key={step.id}>
-                                <span>{step.name.replaceAll("_", " ")}</span>
-                                <Status value={step.status} />
-                                <span className="caption">
-                                  {ms(step.duration)}
-                                </span>
-                                {step.error && (
-                                  <p className="error-text">{step.error}</p>
-                                )}
-                              </li>
+                        {(tabs[lane.id] || "answer") === "answer" && (
+                          <>
+                            <div className="answer-text">
+                              {state?.answer ? (
+                                <ReactMarkdown
+                                  remarkPlugins={[remarkGfm]}
+                                  components={{
+                                    img: () => null,
+                                    a: ({ href, children }) =>
+                                      href?.startsWith("#evidence-") &&
+                                      state.evidence.some(
+                                        (e) => e.label === href.slice(10),
+                                      ) ? (
+                                        <button
+                                          className="citation"
+                                          onClick={() => {
+                                            const e = state.evidence.find(
+                                              (e) => e.label === href.slice(10),
+                                            );
+                                            if (e)
+                                              setInspection({
+                                                kind: "evidence",
+                                                evidence: e,
+                                              });
+                                          }}
+                                        >
+                                          {children}
+                                        </button>
+                                      ) : (
+                                        <span>{children}</span>
+                                      ),
+                                  }}
+                                >
+                                  {state.answer.replace(
+                                    /\[(E[1-9][0-9]*)\]/g,
+                                    "[$1](#evidence-$1)",
+                                  )}
+                                </ReactMarkdown>
+                              ) : (
+                                <p className="muted">
+                                  {state?.status === "running"
+                                    ? "Retrieving evidence…"
+                                    : "Waiting for this lane."}
+                                </p>
+                              )}
+                              {state?.error && (
+                                <ErrorNotice message={state.error} />
+                              )}
+                            </div>
+                          </>
+                        )}
+                        {(tabs[lane.id] || "answer") !== "workflow" && (
+                          <div className="lane-evidence">
+                            {state?.evidence.map((e) => (
+                              <button
+                                key={e.evidence_id}
+                                onClick={() =>
+                                  setInspection({
+                                    kind: "evidence",
+                                    evidence: e,
+                                  })
+                                }
+                              >
+                                <span>{e.label}</span>
+                                {e.source_name}
+                                <ChevronRight size={14} />
+                              </button>
                             ))}
-                          </ol>
-                        </details>
+                          </div>
+                        )}
+                        {tabs[lane.id] === "workflow" && (
+                          <Workflow
+                            technique={lane.technique}
+                            state={state}
+                            selected={
+                              inspection?.kind === "step" &&
+                              inspection.laneId === lane.id
+                                ? inspection.spanId
+                                : undefined
+                            }
+                            follow={followLane === lane.id}
+                            onFollow={() =>
+                              setFollowLane((prior) =>
+                                prior === lane.id ? null : lane.id,
+                              )
+                            }
+                            onSelect={(spanId) =>
+                              setInspection({
+                                kind: "step",
+                                laneId: lane.id,
+                                spanId,
+                              })
+                            }
+                          />
+                        )}
+                        {terminal(state?.status || "") && (
+                          <div className="lane-actions">
+                            <Button
+                              onClick={() =>
+                                action(async () => {
+                                  setRun(
+                                    await post<Run>(
+                                      `/projects/${project}/runs`,
+                                      {
+                                        corpus_version_id:
+                                          run.corpus_version_id,
+                                        question: run.question,
+                                        parent_run_id: run.id,
+                                        lanes: [
+                                          {
+                                            config_id: lane.config_id,
+                                            bundle_id: lane.bundle_id,
+                                          },
+                                        ],
+                                      },
+                                      true,
+                                    ),
+                                  );
+                                })
+                              }
+                            >
+                              Run this lane again
+                            </Button>
+                            <details>
+                              <summary>Timing details</summary>
+                              <dl>
+                                {Object.entries(state?.metrics || {}).map(
+                                  ([key, value]) => (
+                                    <div key={key}>
+                                      <dt>
+                                        {key
+                                          .replaceAll("_", " ")
+                                          .replace(" ms", "")}
+                                      </dt>
+                                      <dd>{ms(value)}</dd>
+                                    </div>
+                                  ),
+                                )}
+                              </dl>
+                            </details>
+                          </div>
+                        )}
                         {!!state?.warnings.length && (
                           <details className="lane-details">
                             <summary>
@@ -833,11 +1062,13 @@ export function Workspace({
       {inspection && (
         <Inspector
           title={
-            inspection.kind === "settings"
-              ? "Pipeline settings"
-              : inspection.kind === "evidence"
-                ? "Source evidence"
-                : "Source preview"
+            inspection.kind === "step"
+              ? "Execution step"
+              : inspection.kind === "settings"
+                ? "Pipeline settings"
+                : inspection.kind === "evidence"
+                  ? "Source evidence"
+                  : "Source preview"
           }
           onClose={closeInspector}
         >
@@ -865,9 +1096,20 @@ export function Workspace({
                 })
               }
             />
-          ) : (
+          ) : inspection.kind === "step" && run ? (
+            <StepInspector
+              runId={run.id}
+              laneId={inspection.laneId}
+              step={
+                playback?.lanes[inspection.laneId]?.stages[inspection.spanId]
+              }
+              onEvidence={(evidence) =>
+                setInspection({ kind: "evidence", evidence })
+              }
+            />
+          ) : inspection.kind !== "step" ? (
             <SourceInspector inspection={inspection} />
-          )}
+          ) : null}
         </Inspector>
       )}
     </div>
@@ -877,7 +1119,7 @@ export function Workspace({
 function SourceInspector({
   inspection,
 }: {
-  inspection: Exclude<Inspection, { kind: "settings" }>;
+  inspection: Exclude<Inspection, { kind: "settings" | "step" }>;
 }) {
   const [preview, setPreview] = useState(""),
     [error, setError] = useState("");
@@ -910,7 +1152,9 @@ function SourceInspector({
               : `Lines ${evidence.location.line_start}–${evidence.location.line_end}`}
           </div>
           <p className="caption">
-            This exact passage was supplied to the answer model.
+            {evidence.included_in_context
+              ? "This exact passage was supplied to the answer model."
+              : "This is a retrieved candidate. It was not recorded as supplied to the answer model."}
             {evidence.span_truncated
               ? " Trimmed to fit the context budget."
               : ""}

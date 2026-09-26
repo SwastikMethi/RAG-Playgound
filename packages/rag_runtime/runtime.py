@@ -38,7 +38,7 @@ async def execute(
         warnings=[],
     )
     began = started if started is not None else time.monotonic()
-    trace = Trace(emit)
+    trace = Trace(emit, result["metrics"])
     generation = config["generation"]
     profile = resolve_profile(profiles, generation["profile_id"], generation["model"], "generation")
     tokenizer = profile.tokenizer

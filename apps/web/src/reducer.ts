@@ -97,6 +97,19 @@ export async function reduceEvent(
         b.toString(16).padStart(2, "0"),
       ).join("");
       if (hex !== p.text_sha256) return resync(state);
+      const labels = [
+        ...new Set(
+          Array.from(lane.answer.matchAll(/\[(E[1-9][0-9]*)\]/g), (m) => m[1]),
+        ),
+      ].sort();
+      const known = new Set(lane.evidence.map((e) => e.label));
+      if (
+        JSON.stringify(labels.filter((l) => known.has(l))) !==
+          JSON.stringify(p.valid_citation_labels) ||
+        JSON.stringify(labels.filter((l) => !known.has(l))) !==
+          JSON.stringify(p.invalid_citation_labels)
+      )
+        return resync(state);
     } else if (event.type === "context.selected")
       lane.evidence = p.evidence as Evidence[];
     else if (event.type === "warning")
@@ -153,7 +166,10 @@ export async function reduceEvent(
         stage.duration = p.duration_ms as number;
       }
       if (event.type === "stage.failed") {
-        stage.status = "failed";
+        stage.status =
+          (p.error as { code: string }).code === "CANCELLED"
+            ? "cancelled"
+            : "failed";
         stage.duration = p.duration_ms as number | null;
         stage.error = (p.error as { message: string }).message;
       }

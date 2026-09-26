@@ -15,13 +15,16 @@ from app.models import (
     Configuration,
     Corpus,
     CorpusSource,
+    Export,
     IndexBundle,
     Job,
     Lane,
     Run,
+    RunEvent,
     Source,
 )
 from app.settings import Settings
+from app.runs import TERMINAL
 from rag_runtime.chunking import chunk_source, parent_child_chunks
 from rag_runtime.contracts import canonical, digest
 from rag_runtime.errors import Problem
@@ -31,7 +34,7 @@ from rag_runtime.runtime import execute
 from rag_runtime.process import run_json
 from rag_runtime.trace import empty_timing
 from rag_runtime.vectors import Scope, VectorStore
-from .events import RunWriter
+from .events import RunWriter, persist_event
 
 
 class Worker:
@@ -76,6 +79,116 @@ class Worker:
             id = job.id if job else None
         return await self.run_once(id) if id else False
 
+    async def reconcile(self):
+        with self.store.session() as s:
+            jobs = list(
+                s.scalars(
+                    select(Job)
+                    .where(Job.status == "running", Job.lease_expires_at <= self.store.now(s))
+                    .with_for_update(skip_locked=True)
+                    .limit(50)
+                )
+            )
+            error = Problem(
+                "WORKER_LOST",
+                "The worker stopped reporting. This execution was not retried; start a new run.",
+            ).public()
+            for job in jobs:
+                job.status, job.error, job.completed_at = "failed", error, self.store.now(s)
+                if job.kind == "compare_run":
+                    self.fail_run(s, job, error)
+                else:
+                    model = {
+                        "ingest_source": Source,
+                        "prepare_index": IndexBundle,
+                        "export_lane": Export,
+                    }.get(job.kind)
+                    resource = (
+                        s.scalar(
+                            select(model).where(
+                                model.id == job.resource_id, model.project_id == job.project_id
+                            )
+                        )
+                        if model
+                        else None
+                    )
+                    if resource:
+                        resource.status, resource.error = "failed", error
+
+    def fail_run(self, s, job, error):
+        run = scoped(s, Run, job.resource_id, job.project_id, lock=True)
+        if run.status in TERMINAL:
+            return
+        lanes = list(s.scalars(select(Lane).where(Lane.run_id == run.id)))
+        events = list(s.scalars(select(RunEvent).where(RunEvent.run_id == run.id).order_by(RunEvent.seq)))
+        elapsed = events[-1].elapsed_ms if events else 0
+        active = {}
+        for event in events:
+            if event.type == "stage.started":
+                active[event.payload["span_id"]] = event
+            elif event.type in {"stage.completed", "stage.failed"}:
+                active.pop(event.payload["span_id"], None)
+        for lane in lanes:
+            if lane.status in TERMINAL:
+                continue
+            for span_id, event in active.items():
+                if event.lane_id == lane.id:
+                    persist_event(
+                        s,
+                        self.store,
+                        run,
+                        lane.id,
+                        "stage.failed",
+                        dict(span_id=span_id, stage=event.payload["stage"], duration_ms=None, error=error),
+                        elapsed,
+                    )
+            metrics = dict(lane.metrics)
+            for event in events:
+                if event.lane_id == lane.id and event.type == "stage.completed":
+                    key = {
+                        "retrieval": "retrieval_ms",
+                        "context_packing": "context_ms",
+                        "generation": "generation_ms",
+                    }.get(event.payload["stage"])
+                    if key:
+                        metrics[key] = event.payload["duration_ms"]
+            usage = dict(lane.usage, accounting="partial")
+            persist_event(
+                s,
+                self.store,
+                run,
+                lane.id,
+                "lane.failed",
+                dict(error=error, metrics=metrics, usage=usage),
+                elapsed,
+            )
+        status = "partial" if any(lane.status == "completed" for lane in lanes) else "failed"
+        persist_event(
+            s,
+            self.store,
+            run,
+            None,
+            "run." + status,
+            dict(status=status, lane_ids=[lane.id for lane in lanes]),
+            elapsed,
+        )
+
+    async def watch_lane(self, claim, lane_id, task):
+        while not task.done():
+            await asyncio.sleep(0.1)
+            try:
+                with self.store.session() as s:
+                    self.store.owned(s, claim["id"], claim["owner_token"])
+                    run = scoped(s, Run, claim["resource_id"], claim["project_id"])
+                    lane = s.scalar(select(Lane).where(Lane.id == lane_id, Lane.run_id == run.id))
+                    cancelled = run.cancel_requested_at or lane.cancel_requested_at or lane.status in TERMINAL
+                if cancelled:
+                    task.cancel()
+                    return
+            except Problem:
+                task.cancel()
+                return
+
     async def watch(self, claim, task):
         while not task.done():
             await asyncio.sleep(self.settings.heartbeat_seconds)
@@ -83,7 +196,7 @@ class Worker:
                 with self.store.session() as s:
                     job = self.store.owned(s, claim["id"], claim["owner_token"])
                     cancel = bool(job.cancel_requested_at)
-                if cancel:
+                if cancel and claim["kind"] != "compare_run":
                     task.cancel()
                     return
                 self.store.heartbeat(claim["id"], claim["owner_token"])
@@ -92,6 +205,7 @@ class Worker:
                 return
 
     async def run_once(self, job_id=None):
+        await self.reconcile()
         claim = self.store.claim(job_id, compare_limit=self.settings.max_compare_runs)
         if not claim:
             return False
@@ -128,10 +242,12 @@ class Worker:
                 job = self.store.owned(s, claim["id"], claim["owner_token"])
                 job.status = (
                     "cancelled"
-                    if error and error.code == "CANCELLED"
+                    if (error and error.code == "CANCELLED") or (not error and job.cancel_requested_at)
                     else ("failed" if error else "succeeded")
                 )
                 job.completed_at, job.error = self.store.now(s), error.public() if error else None
+                if error and claim["kind"] == "compare_run":
+                    self.fail_run(s, job, error.public())
                 if error and claim["kind"] in {"ingest_source", "prepare_index"}:
                     model = Source if claim["kind"] == "ingest_source" else IndexBundle
                     resource = scoped(s, model, claim["resource_id"], claim["project_id"])
@@ -215,8 +331,13 @@ class Worker:
             scope = dict(
                 project_id=bundle.project_id,
                 corpus_version_id=corpus.id,
-                variant_fingerprint=bundle.requirements_sha256,
+                variant_fingerprint=digest(
+                    dict(requirements=bundle.requirements_sha256, build=claim["owner_token"])
+                ),
             )
+            if config["embedding"]:
+                job = s.get(Job, claim["id"])
+                job.progress = dict(vector_scope=scope, vector_dimensions=config["embedding"]["dimensions"])
         chunks, parents = [], []
         for source in sources:
             if config["parent"]:
@@ -283,7 +404,13 @@ class Worker:
             queue_ms = max(0, (job.started_at - run.created_at).total_seconds() * 1000)
             question = run.question
         await writer.emit(None, "run.started", dict(lane_ids=[lane.id for lane in lanes], queue_ms=queue_ms))
-        await asyncio.gather(*(self.lane(claim, writer, lane, question) for lane in lanes))
+        tasks = [asyncio.create_task(self.lane(claim, writer, lane, question)) for lane in lanes]
+        try:
+            await asyncio.gather(*tasks)
+        finally:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
         with self.store.session() as s:
             states = list(s.scalars(select(Lane.status).where(Lane.run_id == claim["resource_id"])))
         status = (
@@ -302,8 +429,19 @@ class Worker:
     async def lane(self, claim, writer, lane, question):
         started = time.monotonic()
         result = dict(answer="", metrics=empty_timing(), usage=empty_usage(), recordings=[])
+        with self.store.session() as s:
+            current = s.scalar(select(Lane).where(Lane.id == lane.id, Lane.run_id == claim["resource_id"]))
+            if current.status in TERMINAL:
+                return
+        watcher = asyncio.create_task(self.watch_lane(claim, lane.id, asyncio.current_task()))
 
         async def emit(kind, payload):
+            if kind not in {"stage.failed", "lane.failed", "lane.cancelled", "lane.timed_out"}:
+                with self.store.session() as s:
+                    run = scoped(s, Run, claim["resource_id"], claim["project_id"])
+                    current = s.scalar(select(Lane).where(Lane.id == lane.id, Lane.run_id == run.id))
+                    if run.cancel_requested_at or current.cancel_requested_at:
+                        raise asyncio.CancelledError()
             await writer.emit(lane.id, kind, payload)
 
         try:
@@ -384,17 +522,24 @@ class Worker:
             try:
                 await emit("lane." + status, payload)
             except Problem as failure:
-                if failure.code != "WORKER_LOST":
+                if failure.code not in {"WORKER_LOST", "LANE_TERMINAL", "RUN_TERMINAL"}:
                     raise
+        finally:
+            watcher.cancel()
+            await asyncio.gather(watcher, return_exceptions=True)
 
 
 async def main():
     worker = Worker(Settings())
     print("Worker ready", flush=True)
-    try:
+
+    async def slot():
         while True:
             if not await worker.run_once():
                 await asyncio.sleep(0.25)
+
+    try:
+        await asyncio.gather(*(slot() for _ in range(5)))
     finally:
         worker.close()
 
