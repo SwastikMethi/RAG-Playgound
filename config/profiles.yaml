@@ -1,2 +1,27 @@
-# Empty until the owner configures a provider. There is no fake live fallback.
-profiles: []
+# Owner-managed OpenAI profiles. Credentials are read from the server environment.
+# Application limits below are deliberately lower than the answer model's maximum capacity.
+profiles:
+  - id: openai-answer
+    label: OpenAI · GPT-4.1 mini
+    kind: openai
+    model: gpt-4.1-mini-2025-04-14
+    operations: [generation, tree_selection, tree_indexing]
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    max_input_tokens: 32768
+    max_output_tokens: 4096
+    tokenizer: o200k_base
+    supports_temperature: true
+    supports_seed: false
+    revision: "2025-04-14"
+  - id: openai-embedding
+    label: OpenAI · Text embedding 3 small
+    kind: openai
+    model: text-embedding-3-small
+    operations: [embedding]
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    max_input_tokens: 8191
+    dimensions: 1536
+    tokenizer: cl100k_base
+    revision: "1"

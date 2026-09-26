@@ -1,6 +1,6 @@
 """Six concrete adapters and server-resolved effective defaults."""
 
-from importlib.metadata import version
+from importlib.metadata import version, PackageNotFoundError
 
 from .contracts import digest, validate
 from .errors import Problem
@@ -21,7 +21,14 @@ TECHNIQUES = {
 
 def defaults(technique: str, profiles: dict, reranker_revision: str = "") -> dict | None:
     def profile(operation):
-        return next((p for p in profiles.values() if operation in p.operations), None)
+        return next(
+            (
+                p
+                for p in profiles.values()
+                if operation in p.operations and (operation != "embedding" or p.dimensions)
+            ),
+            None,
+        )
 
     gen, emb, index, selection = [
         profile(op) for op in ("generation", "embedding", "tree_indexing", "tree_selection")
@@ -70,7 +77,7 @@ def defaults(technique: str, profiles: dict, reranker_revision: str = "") -> dic
             index_model=index.model,
             selection_profile_id=selection.id,
             selection_model=selection.model,
-            sdk_version=version("pageindex"),
+            sdk_version=installed_version("pageindex"),
             max_documents=3,
             max_depth=4,
             max_nodes=12,
@@ -139,6 +146,23 @@ def check_config(config: dict, profiles: dict, require_available=True):
         reason = reranker_unavailable(config["reranker"])
         if reason and require_available:
             raise Problem("MODEL_NOT_READY", reason, 409)
+    if config["tree"]:
+        from .pageindex_adapter import unavailable_reason, SDK_VERSION
+
+        reason = unavailable_reason()
+        if require_available and reason:
+            raise Problem("ADAPTER_UNAVAILABLE", reason, 409)
+        if config["tree"]["sdk_version"] != SDK_VERSION:
+            raise Problem(
+                "ADAPTER_UNAVAILABLE", "Select a configuration using the tested PageIndex SDK revision.", 409
+            )
+
+
+def installed_version(name):
+    try:
+        return version(name)
+    except PackageNotFoundError:
+        return None
 
 
 def capabilities(profiles, settings):

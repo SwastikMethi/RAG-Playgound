@@ -37,7 +37,7 @@ def test_dense_hybrid_and_real_reranker_share_preparation_but_embed_queries_inde
     ).json()
     capabilities = client.get("/api/v1/system/capabilities").json()["items"]
     lanes = []
-    for technique in ["dense", "hybrid", "hybrid_rerank"]:
+    for technique in ["dense", "hybrid", "hybrid_rerank", "parent_child"]:
         config = next(c for c in capabilities if c["technique"] == technique)["default_config"]
         assert config["reranker"] is None or config["reranker"]["model_revision"]
         saved = client.post(
@@ -54,9 +54,9 @@ def test_dense_hybrid_and_real_reranker_share_preparation_but_embed_queries_inde
             asyncio.run(worker.run_once(bundle["job_id"]))
         bundle = client.get("/api/v1/index-bundles/" + bundle["id"]).json()
         assert bundle["status"] == "ready", bundle
-        assert bundle["preparation_reused"] == (technique != "dense")
+        assert bundle["preparation_reused"] == (technique in {"hybrid", "hybrid_rerank"})
         lanes.append(dict(config_id=saved["id"], bundle_id=bundle["id"]))
-    assert len(calls) == 1
+    assert len(calls) == 2
     calls.clear()
     response = client.post(
         f"/api/v1/projects/{project}/runs",
@@ -68,10 +68,11 @@ def test_dense_hybrid_and_real_reranker_share_preparation_but_embed_queries_inde
     asyncio.run(worker.run_resource(run["id"]))
     result = client.get("/api/v1/runs/" + run["id"]).json()
     assert result["status"] == "completed", result
-    assert len(calls) == 3
+    assert len(calls) == 4
     assert all(lane["usage"]["embedding_tokens"] > 0 for lane in result["lanes"])
     events = client.get("/api/v1/runs/" + run["id"] + "/events").text
     assert '"rerank.completed"' in events and '"branch_ranks"' in events
+    assert '"parent_expansion"' in events and '"child_ids"' in events
     original_stream = worker.gateway.stream
     generation_calls = 0
 

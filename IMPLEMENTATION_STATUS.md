@@ -8,7 +8,7 @@ Implementation is in progress on `codex/implement-rag-playground`. The approved 
 | M1 BM25 slice | Verified functional slice | 12 Python checks, reducer check, production build and browser upload → prepare → answer → citation → replay journey pass |
 | M2 dense/hybrid/rerank | Verified functional adapters | 17 Python checks pass, including real Qdrant isolation, cross-encoder inference, parallel wall timing, preparation reuse and failure isolation |
 | M3 traces/recovery | Verified event and recovery path | 25 Python checks, 3 frontend checks; fixed workflow graphs and step inspector; persisted replay, Unicode/citation integrity, cancellation, deadlines and worker fencing |
-| M4 hierarchy/PageIndex | Pending | |
+| M4 hierarchy/PageIndex | Implemented; live models pending | Real parent-child vector path; PageIndex 0.2.19 PDF indexing, tree/page APIs, bounded selection and end-to-end worker tested with synthetic model boundaries |
 | M5 PostgreSQL source | Pending | |
 | M6 export | Pending | |
 | M7 product completion | Pending | |
@@ -20,7 +20,7 @@ All 16 original implementation documents, six configuration examples, 45 trace e
 
 ## Decisions
 
-- The user selected an owner-configured OpenAI-compatible endpoint. Live credentials/models are not yet configured for this application.
+- The user selected the standard OpenAI API endpoint. Server profiles use GPT-4.1 mini (2025-04-14 snapshot) and text-embedding-3-small (1,536 dimensions). OPENAI_API_KEY is still required for live verification.
 - This was a new directory with no Git history or unrelated application changes; implementation uses a dedicated initial branch in place.
 - PostgreSQL owns jobs and event recovery; no Redis or extra broker.
 - Fixture preview is explicit and separate from live projects.
@@ -40,3 +40,6 @@ Release-wide checks and full rendered state coverage remain pending. Actual rera
 - Inspected `test-results/bm25-desktop.png` (1440px) and `test-results/bm25-mobile.png` (390px). Source and answer text are readable and there is no mobile horizontal overflow. This is provisional visual evidence: vertical density, mobile workspace controls, complete workflows, 1024px, keyboard and reduced-motion gates remain for M7/M8.
 - M2 actual cross-encoder inference passed using `cross-encoder/ms-marco-MiniLM-L6-v2@233902d25c440f23af6f7d6e94d2946bac0bee0a`, CPU, safetensors, offline loading. Public weights were downloaded explicitly; no private source data was sent for this setup.
 - Qdrant client and server are both pinned to 1.17.0 after a compatibility warning on the initially resolved client. Scoped read/delete checks pass without the warning.
+
+- M4 PageIndex actual SDK indexing and original-page mapping passed against a local synthetic summary provider. Its internal retry ladder cannot bypass the application’s two-attempt limit; cancellation kills the owned indexing process group and removes its temporary store. This is a real SDK compatibility check, not live model verification.
+- Model settings were checked against the [OpenAI model reference](https://developers.openai.com/api/docs/models/gpt-4.1-mini) and [embedding guide](https://developers.openai.com/api/docs/guides/embeddings). The PageIndex adapter follows its [public document APIs](https://docs.pageindex.ai/sdk/documents).

@@ -49,7 +49,9 @@ class Profile(BaseModel):
             return "Configure the server-side credential for this profile."
         if "embedding" in self.operations and (not self.dimensions or not self.tokenizer):
             return "Embedding dimensions and a compatible tokenizer must be configured."
-        if "generation" in self.operations and (not self.max_output_tokens or not self.tokenizer):
+        if {"generation", "tree_selection", "tree_indexing"}.intersection(self.operations) and (
+            not self.max_output_tokens or not self.tokenizer
+        ):
             return "Generation token limits and a compatible tokenizer must be configured."
         return None
 
@@ -135,6 +137,24 @@ def empty_usage():
     )
 
 
+def add_usage(total, usage):
+    for key in ("input_tokens", "output_tokens", "embedding_tokens"):
+        if usage[key] is not None:
+            total[key] = (total[key] or 0) + usage[key]
+    modes = {total["accounting"], usage["accounting"]}
+    total["accounting"] = (
+        "partial"
+        if "partial" in modes
+        else "estimated"
+        if "estimated" in modes
+        else "reported"
+        if modes == {"reported"} or total["accounting"] == "unavailable" and usage["accounting"] == "reported"
+        else "partial"
+        if "reported" in modes
+        else "unavailable"
+    )
+
+
 def provider_error(exc):
     status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None
     if status in {401, 403}:
@@ -161,6 +181,86 @@ class Gateway:
                 self.embedding_concurrency if operation == "embedding" else self.generation_concurrency
             )
         return self._semaphores[key]
+
+    async def complete(self, profile, messages, *, max_tokens=512, json_mode=False, retries=0):
+        """Bounded non-streaming model boundary for selection and SDK indexing."""
+        if profile.unavailable_reason:
+            raise Problem("MISSING_CREDENTIALS", profile.unavailable_reason)
+        if profile.kind == "fixture":
+            raise Problem(
+                "ADAPTER_UNAVAILABLE",
+                "Tree indexing and selection require a configured model; no synthetic tree is substituted.",
+            )
+        max_tokens = min(max_tokens, profile.max_output_tokens or 512)
+        if (
+            token_count(json.dumps(messages, ensure_ascii=False), profile.tokenizer) + max_tokens + 64
+            > profile.max_input_tokens
+        ):
+            raise Problem(
+                "MODEL_INPUT_LIMIT", "The tree selection or indexing prompt exceeds this model's input limit."
+            )
+        payload = dict(model=profile.model, messages=messages, stream=False, max_tokens=max_tokens)
+        if profile.supports_temperature:
+            payload["temperature"] = 0
+        if json_mode:
+            payload["response_format"] = dict(type="json_object")
+        wait = 0
+        for attempt in range(retries + 1):
+            began = time.monotonic()
+            async with self.semaphore(profile, "model"):
+                wait += (time.monotonic() - began) * 1000
+                try:
+                    async with httpx.AsyncClient(
+                        transport=self.transport,
+                        timeout=httpx.Timeout(90, connect=10),
+                        follow_redirects=False,
+                        trust_env=False,
+                    ) as client:
+                        response = await client.post(
+                            profile.base_url.rstrip("/") + "/chat/completions",
+                            headers={"Authorization": f"Bearer {profile.key}"},
+                            json=payload,
+                        )
+                        response.raise_for_status()
+                        if len(response.content) > 1024 * 1024:
+                            raise Problem(
+                                "PROVIDER_OUTPUT_LIMIT", "The model response exceeded the output limit."
+                            )
+                        body = response.json()
+                    value = body["choices"][0]["message"]["content"]
+                    if not isinstance(value, str) or body["choices"][0].get("finish_reason") != "stop":
+                        raise Problem(
+                            "MODEL_OUTPUT_INVALID",
+                            "The model did not return a complete selection or summary.",
+                        )
+                    counts = body.get("usage") or {}
+                    usage = dict(
+                        empty_usage(),
+                        input_tokens=counts.get("prompt_tokens"),
+                        output_tokens=counts.get("completion_tokens"),
+                        accounting="reported"
+                        if counts.get("prompt_tokens") is not None
+                        and counts.get("completion_tokens") is not None
+                        else "unavailable",
+                    )
+                    return dict(
+                        text=value,
+                        usage=usage,
+                        wait_ms=wait,
+                        recording=dict(
+                            operation="completion",
+                            model=profile.model,
+                            input_sha256=digest(messages),
+                            text=value,
+                            usage=usage,
+                            attempts=attempt + 1,
+                        ),
+                    )
+                except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as exc:
+                    error = provider_error(exc)
+                    if attempt == retries or not error.retryable:
+                        raise error from None
+            await asyncio.sleep(0.25)
 
     async def embed(self, profile, inputs):
         if profile.unavailable_reason:

@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     profiles_path: Path = Path("config/profiles.yaml")
     master_key: SecretStr = SecretStr("")
     database_host_allowlist: list[str] = []
-    provider_host_allowlist: list[str] = []
+    provider_host_allowlist: list[str] = ["api.openai.com"]
     max_compare_runs: int = Field(2, ge=1, le=2)
     provider_concurrency: int = Field(4, ge=1, le=16)
     embedding_concurrency: int = Field(4, ge=1, le=16)

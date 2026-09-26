@@ -8,7 +8,7 @@ from .chunking import lexical_tokens, token_count
 from .context import GROUNDING, INSUFFICIENT, citation_status, pack_context
 from .contracts import digest
 from .errors import Problem
-from .providers import empty_usage
+from .providers import empty_usage, add_usage
 from .registry import resolve_profile
 from .retrieval import bm25_search, fuse, expand_parents
 from .reranker import rerank
@@ -77,6 +77,7 @@ async def execute(
             async with trace.span(
                 "query_embedding", retrieval.id, dict(model=p.model, dimensions=p.dimensions)
             ) as embedding:
+                result["provider_attempted"] = True
                 vector = await gateway.embed(p, [emb["query_prefix"] + question])
                 embedding.wait_ms = vector["wait_ms"]
                 result["metrics"]["provider_wait_ms"] = (result["metrics"]["provider_wait_ms"] or 0) + vector[
@@ -129,7 +130,23 @@ async def execute(
                 )
                 return hits
 
-        if config["search"]["rrf"]:
+        if config["tree"]:
+            from .pageindex_adapter import retrieve_tree
+
+            candidates = await retrieve_tree(
+                question,
+                prepared["documents"],
+                config["tree"],
+                profiles,
+                gateway,
+                trace,
+                retrieval.id,
+                result,
+            )
+            await emit(
+                "retrieval.candidates", dict(span_id=retrieval.id, stage="retrieval", candidates=candidates)
+            )
+        elif config["search"]["rrf"]:
             branches = [asyncio.create_task(lexical()), asyncio.create_task(dense())]
             try:
                 lexical_hits, dense_hits = await asyncio.gather(*branches)
@@ -234,6 +251,7 @@ async def execute(
         ]
         async with trace.span("generation", details=dict(model=profile.model)) as generation_span:
             output_usage = None
+            result["provider_attempted"] = True
             async for frame in gateway.stream(profile, generation, messages):
                 if "wait_ms" in frame:
                     generation_span.wait_ms += frame["wait_ms"]
@@ -262,20 +280,19 @@ async def execute(
                         )
             if not result["answer"]:
                 raise Problem("EMPTY_ANSWER", "The model provider returned no answer text.", 502)
-            embedding_tokens = result["usage"]["embedding_tokens"]
-            result["usage"] = output_usage or dict(
+            generation_usage = output_usage or dict(
                 empty_usage(),
                 input_tokens=token_count(str(messages), tokenizer),
                 output_tokens=token_count(result["answer"], tokenizer),
                 accounting="estimated",
             )
-            result["usage"]["embedding_tokens"] = embedding_tokens
+            add_usage(result["usage"], generation_usage)
             result["recordings"].append(
                 dict(
                     operation="generation",
                     request_sha256=digest(dict(config=generation, messages=messages)),
                     response=result["answer"],
-                    usage=result["usage"],
+                    usage=generation_usage,
                     profile_fingerprint=profile.fingerprint(),
                 )
             )
@@ -286,7 +303,7 @@ async def execute(
                     operation="generation",
                     profile_id=profile.id,
                     model=profile.model,
-                    usage=result["usage"],
+                    usage=generation_usage,
                 ),
             )
         result["metrics"].update(

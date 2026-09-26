@@ -129,6 +129,14 @@ export function Workspace({
     return () => clearTimeout(timer);
   }, [playing, cursor, events, speed, compressed, run?.id]);
   const corpus = corpora.find((c) => c.id === corpusId);
+  const treeCorpusReason = !corpus
+    ? "Select a corpus of text-layer PDFs."
+    : corpus.source_ids.length > 10 ||
+        corpus.source_ids.some(
+          (id) => sources.find((s) => s.id === id)?.metadata.format !== "pdf",
+        )
+      ? "PageIndex requires a corpus containing only text-layer PDFs (up to 10)."
+      : null;
   const selectedConfigs = selected
     .map((id) => configs.find((c) => c.id === id))
     .filter((c): c is Configuration => !!c);
@@ -582,7 +590,11 @@ export function Workspace({
                     key={c.technique}
                     className="technique-option"
                     disabled={
-                      !c.available || busy || selected.length >= 6 || active
+                      !c.available ||
+                      (c.technique === "pageindex" && !!treeCorpusReason) ||
+                      busy ||
+                      selected.length >= 6 ||
+                      active
                     }
                     onClick={() => addTechnique(c)}
                   >
@@ -591,6 +603,9 @@ export function Workspace({
                       <Plus size={16} />
                     </div>
                     <p>{c.description}</p>
+                    {c.technique === "pageindex" && treeCorpusReason && (
+                      <span className="caption">{treeCorpusReason}</span>
+                    )}
                     {!c.available && (
                       <span className="caption">{c.unavailable_reason}</span>
                     )}

@@ -2181,7 +2181,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115,<1" },
     { name = "httpx", specifier = ">=0.28,<1" },
     { name = "jsonschema", specifier = ">=4.23,<5" },
-    { name = "pageindex", marker = "extra == 'tree'" },
+    { name = "pageindex", marker = "extra == 'tree'", specifier = "==0.2.19" },
     { name = "psutil", specifier = ">=7,<8" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.2,<4" },
     { name = "pydantic-settings", specifier = ">=2.8,<3" },

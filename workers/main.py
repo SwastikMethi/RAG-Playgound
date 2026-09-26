@@ -340,6 +340,8 @@ class Worker:
                 job.progress = dict(vector_scope=scope, vector_dimensions=config["embedding"]["dimensions"])
         chunks, parents = [], []
         for source in sources:
+            if config["tree"]:
+                continue
             if config["parent"]:
                 children, expanded = parent_child_chunks(
                     source, config["chunking"], config["parent"]["max_parent_tokens"]
@@ -348,7 +350,7 @@ class Worker:
                 parents.extend(expanded)
             else:
                 chunks.extend(chunk_source(source, config["chunking"]))
-        if not chunks or len(chunks) > 10_000:
+        if (not chunks and not config["tree"]) or len(chunks) > 10_000:
             raise Problem("CHUNK_LIMIT", "Preparation requires 1–10,000 chunks.")
         prepared = dict(
             chunks=chunks,
@@ -358,6 +360,30 @@ class Worker:
             recordings=[],
             versions=dict(bm25=version("rank-bm25"), lexical="lexical_v1", tokenizer=version("tiktoken")),
         )
+        if config["tree"]:
+            from rag_runtime.pageindex_build import build_document
+
+            documents = []
+            for source in sources:
+                with self.store.session() as s:
+                    self.store.owned(s, claim["id"], claim["owner_token"])
+                    src = scoped(s, Source, source["source_id"], claim["project_id"])
+                    raw = scoped(s, Artifact, src.raw_artifact_id, claim["project_id"])
+                    path = self.store.path(raw)
+                document = await build_document(
+                    path,
+                    source,
+                    self.profiles[config["tree"]["index_profile_id"]],
+                    self.gateway,
+                    root=self.store.root,
+                )
+                prepared["recordings"].extend(document.pop("recordings"))
+                documents.append(document)
+            prepared["documents"] = documents
+            prepared["versions"]["pageindex"] = config["tree"]["sdk_version"]
+            prepared["preprocessing"] = (
+                "PageIndex SDK builds the tree from the original PDF; final evidence uses canonical original-page extraction."
+            )
         if config["embedding"]:
             emb = config["embedding"]
             vector = await self.gateway.embed(
@@ -513,7 +539,7 @@ class Worker:
                 )
             )
             result["metrics"]["total_ms"] = (time.monotonic() - started) * 1000
-            if result.get("answer"):
+            if result.get("answer") or result.get("provider_attempted"):
                 result["usage"]["accounting"] = "partial"
             payload = dict(metrics=result["metrics"], usage=result["usage"])
             payload.update(
