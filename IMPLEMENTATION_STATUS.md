@@ -9,7 +9,7 @@ Implementation is in progress on `codex/implement-rag-playground`. The approved 
 | M2 dense/hybrid/rerank | Verified functional adapters | 17 Python checks pass, including real Qdrant isolation, cross-encoder inference, parallel wall timing, preparation reuse and failure isolation |
 | M3 traces/recovery | Verified event and recovery path | 25 Python checks, 3 frontend checks; fixed workflow graphs and step inspector; persisted replay, Unicode/citation integrity, cancellation, deadlines and worker fencing |
 | M4 hierarchy/PageIndex | Implemented; live models pending | Real parent-child vector path; PageIndex 0.2.19 PDF indexing, tree/page APIs, bounded selection and end-to-end worker tested with synthetic model boundaries |
-| M5 PostgreSQL source | Pending | |
+| M5 PostgreSQL source | Implemented and integration checked | Encrypted credentials, exact host/relation/column policy, read-only repeatable-read snapshots, stable keys, preview, refresh and row evidence; three real PostgreSQL integration tests |
 | M6 export | Pending | |
 | M7 product completion | Pending | |
 | M8 release verification | Pending | |
@@ -43,3 +43,7 @@ Release-wide checks and full rendered state coverage remain pending. Actual rera
 
 - M4 PageIndex actual SDK indexing and original-page mapping passed against a local synthetic summary provider. Its internal retry ladder cannot bypass the application’s two-attempt limit; cancellation kills the owned indexing process group and removes its temporary store. This is a real SDK compatibility check, not live model verification.
 - Model settings were checked against the [OpenAI model reference](https://developers.openai.com/api/docs/models/gpt-4.1-mini) and [embedding guide](https://developers.openai.com/api/docs/guides/embeddings). The PageIndex adapter follows its [public document APIs](https://docs.pageindex.ai/sdk/documents).
+
+## PostgreSQL snapshot verification
+
+Three real PostgreSQL tests pass with a dedicated column-scoped read-only role: hostile quoted identifiers, encrypted credentials, approved columns, cross-project isolation, duplicate/null key rejection, write-role rejection, row/byte caps, repeatable-read isolation and statement deadlines. Capture refresh creates a distinct source; old answers use frozen row text after database mutation and connection deletion. Two execution/network checks also pass, including metadata-address rejection. The connection UI and row inspector compile; rendered connector review remains in M7. Setup policy is documented in [operating instructions](docs/17_RUNNING_THE_APPLICATION.md).

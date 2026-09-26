@@ -40,10 +40,12 @@ import {
   type TraceEvent,
 } from "./reducer";
 import { streamEvents } from "./stream";
+import { PostgresSource } from "./PostgresSource";
 import { Workflow, StepInspector, LiveDuration } from "./Workflow";
 
 type View = "playground" | "sources" | "history";
 type Inspection =
+  | { kind: "postgres"; source?: Source }
   | { kind: "source"; source: Source }
   | { kind: "evidence"; evidence: Evidence }
   | { kind: "step"; laneId: string; spanId: string }
@@ -403,6 +405,12 @@ export function Workspace({
                   comparing.
                 </p>
               </div>
+              <Button
+                disabled={busy}
+                onClick={() => setInspection({ kind: "postgres" })}
+              >
+                Connect PostgreSQL
+              </Button>
               <label className={`button ${busy ? "disabled" : ""}`}>
                 <Upload size={16} />
                 Upload files
@@ -461,6 +469,17 @@ export function Workspace({
                       )}
                     </button>
                     <Status value={source.status} />
+                    {source.kind === "postgres" &&
+                      source.status === "ready" && (
+                        <Button
+                          aria-label={`Refresh ${source.display_name}`}
+                          onClick={() =>
+                            setInspection({ kind: "postgres", source })
+                          }
+                        >
+                          Refresh
+                        </Button>
+                      )}
                   </div>
                 ))}
                 <div className="source-footer">
@@ -1077,17 +1096,46 @@ export function Workspace({
       {inspection && (
         <Inspector
           title={
-            inspection.kind === "step"
-              ? "Execution step"
-              : inspection.kind === "settings"
-                ? "Pipeline settings"
-                : inspection.kind === "evidence"
-                  ? "Source evidence"
-                  : "Source preview"
+            inspection.kind === "postgres"
+              ? "PostgreSQL snapshot"
+              : inspection.kind === "step"
+                ? "Execution step"
+                : inspection.kind === "settings"
+                  ? "Pipeline settings"
+                  : inspection.kind === "evidence"
+                    ? "Source evidence"
+                    : "Source preview"
           }
           onClose={closeInspector}
         >
-          {inspection.kind === "settings" ? (
+          {inspection.kind === "postgres" ? (
+            <PostgresSource
+              project={project}
+              initial={inspection.source}
+              onCaptured={(source) => {
+                setSources((prior) => [...prior, source]);
+                setSelectedSources((prior) => [...prior, source.id]);
+              }}
+              onReady={async (source) => {
+                const previous = inspection.source;
+                await load();
+                if (previous && corpus?.source_ids.includes(previous.id)) {
+                  const next = await post<Corpus>(
+                    `/projects/${project}/corpus-versions`,
+                    {
+                      source_ids: corpus.source_ids.map((id) =>
+                        id === previous.id ? source.id : id,
+                      ),
+                    },
+                  );
+                  setCorpusId(next.id);
+                  setSelectedSources(next.source_ids);
+                  await load();
+                }
+                closeInspector();
+              }}
+            />
+          ) : inspection.kind === "settings" ? (
             <ConfigurationForm
               config={inspection.config}
               busy={busy}
@@ -1164,6 +1212,8 @@ function SourceInspector({
             {evidence.label} ·{" "}
             {evidence.location.page_start
               ? `Page ${evidence.location.page_start}`
+              : evidence.location.record_key
+              ? `Record ${JSON.stringify(evidence.location.record_key)}`
               : `Lines ${evidence.location.line_start}–${evidence.location.line_end}`}
           </div>
           <p className="caption">
@@ -1182,6 +1232,7 @@ function SourceInspector({
             <dl>
               <dt>Rank</dt>
               <dd>{evidence.rank}</dd>
+              {evidence.location.relation && <><dt>Relation</dt><dd>{evidence.location.relation}</dd></>}
               <dt>Score type</dt>
               <dd>{evidence.score_type}</dd>
               <dt>Score</dt>
@@ -1198,6 +1249,10 @@ function SourceInspector({
           </details>
         </>
       )}
+      {inspection.kind === "source" && inspection.source.kind === "postgres" && <p className="caption">
+        Frozen snapshot · captured {String(inspection.source.metadata.captured_at || "—")}
+        {inspection.source.metadata.truncated ? " · Capture limit reached; this is a partial snapshot." : ""}
+      </p>}
       <h3 className="spaced">Source text</h3>
       {error ? (
         <ErrorNotice message={error} />

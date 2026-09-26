@@ -1,8 +1,18 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class DatabaseRelationPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    host: str = Field(min_length=1, max_length=300)
+    port: int = Field(5432, ge=1, le=65535)
+    database: str = Field(min_length=1, max_length=200)
+    schema_name: str = Field(alias="schema", min_length=1, max_length=63)
+    relation: str = Field(min_length=1, max_length=63)
+    columns: list[str] = Field(min_length=1, max_length=100)
 
 
 class Settings(BaseSettings):
@@ -15,6 +25,7 @@ class Settings(BaseSettings):
     profiles_path: Path = Path("config/profiles.yaml")
     master_key: SecretStr = SecretStr("")
     database_host_allowlist: list[str] = []
+    database_relation_allowlist: list[dict] = []
     provider_host_allowlist: list[str] = ["api.openai.com"]
     max_compare_runs: int = Field(2, ge=1, le=2)
     provider_concurrency: int = Field(4, ge=1, le=16)
@@ -26,6 +37,11 @@ class Settings(BaseSettings):
     reranker_revision: str = "233902d25c440f23af6f7d6e94d2946bac0bee0a"
     qdrant_collection_prefix: str = "rag_v1"
     web_dist: Path = Path("apps/web/dist")
+
+    @field_validator("database_relation_allowlist")
+    @classmethod
+    def relation_policy(cls, value):
+        return [DatabaseRelationPolicy.model_validate(p).model_dump(by_alias=True) for p in value]
 
     @field_validator("app_token")
     @classmethod

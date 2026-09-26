@@ -35,3 +35,22 @@ async def test_measured_failed_span_and_owned_subprocess_cancellation(tmp_path):
         await task
     await asyncio.sleep(1)
     assert not output.exists()
+
+
+@pytest.mark.asyncio
+async def test_connection_resolution_rejects_metadata_even_through_approved_dns(monkeypatch):
+    import socket
+    from unittest.mock import AsyncMock
+    from rag_runtime.network import resolve_host
+    from rag_runtime.errors import Problem
+
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(
+        loop,
+        "getaddrinfo",
+        AsyncMock(return_value=[(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("169.254.169.254", 5432))]),
+    )
+    with pytest.raises(Problem, match="Metadata"):
+        await resolve_host("approved.example", 5432, ["approved.example"])
+    with pytest.raises(Problem, match="allowlist"):
+        await resolve_host("unknown.example", 5432, ["approved.example"])

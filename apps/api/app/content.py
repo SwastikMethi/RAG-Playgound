@@ -166,7 +166,13 @@ def source_file(source_id: str, request: Request):
         return FileResponse(
             store.path(artifact),
             media_type="application/octet-stream",
-            filename="source.pdf" if source.source_metadata["format"] == "pdf" else "source.txt",
+            filename=(
+                "snapshot.json"
+                if source.kind == "postgres"
+                else "source.pdf"
+                if source.source_metadata["format"] == "pdf"
+                else "source.txt"
+            ),
         )
 
 

@@ -8,12 +8,14 @@ from . import models as m
 
 
 def present(session, obj):
-    names = {m.Configuration: "Configuration", m.IndexBundle: "IndexBundle"}
+    names = {m.Configuration: "Configuration", m.IndexBundle: "IndexBundle", m.Connection: "PublicConnection"}
     name = names.get(type(obj), type(obj).__name__)
     schema = schema_file("openapi.yaml")["components"]["schemas"][name]
     values = {key: getattr(obj, key) for key in schema["properties"] if hasattr(obj, key)}
     if isinstance(obj, m.Source):
         values["metadata"] = obj.source_metadata
+    if isinstance(obj, m.Connection):
+        values.update(obj.public_config)
     if isinstance(obj, m.Corpus):
         values["source_ids"] = list(
             session.scalars(

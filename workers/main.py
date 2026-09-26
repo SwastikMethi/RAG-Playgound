@@ -13,6 +13,7 @@ from app.models import (
     Artifact,
     Chunk,
     Configuration,
+    Connection,
     Corpus,
     CorpusSource,
     Export,
@@ -261,6 +262,13 @@ class Worker:
         with self.store.session() as s:
             self.store.owned(s, claim["id"], claim["owner_token"])
             source = scoped(s, Source, claim["resource_id"], claim["project_id"])
+            postgres = source.kind == "postgres"
+        if postgres:
+            await self.capture_postgres(claim)
+            return
+        with self.store.session() as s:
+            self.store.owned(s, claim["id"], claim["owner_token"])
+            source = scoped(s, Source, claim["resource_id"], claim["project_id"])
             artifact = scoped(s, Artifact, source.raw_artifact_id, source.project_id)
             path, kind, name = (
                 self.store.path(artifact),
@@ -285,6 +293,50 @@ class Worker:
                 parser_revision=parsed["parser_revision"],
                 characters=len(parsed["text"]),
                 pages=len(parsed["segments"]) if kind == "pdf" else 0,
+            )
+
+    async def capture_postgres(self, claim):
+        from app.connections import password
+        from rag_runtime.postgres_source import capture
+
+        with self.store.session() as s:
+            self.store.owned(s, claim["id"], claim["owner_token"])
+            source = scoped(s, Source, claim["resource_id"], claim["project_id"])
+            connection = scoped(s, Connection, source.source_metadata["connection_id"], claim["project_id"])
+            config, secret = connection.public_config, password(self.settings, connection)
+            selection = source.source_metadata["selection"]
+        try:
+            snapshot = await capture(
+                config,
+                secret,
+                self.settings.database_host_allowlist,
+                self.settings.database_relation_allowlist,
+                selection,
+            )
+        except TimeoutError:
+            raise Problem("DATABASE_TIMEOUT", "Snapshot capture exceeded its time limit.") from None
+        with self.store.session() as s:
+            self.store.owned(s, claim["id"], claim["owner_token"])
+            source = scoped(s, Source, claim["resource_id"], claim["project_id"])
+            raw = self.store.put(s, source.project_id, "raw_snapshot", canonical(snapshot["raw"]))
+            parsed = dict(snapshot["parsed"], source_id=source.id, name=source.display_name)
+            artifact = self.store.put(s, source.project_id, "parsed_source", canonical(parsed))
+            source.raw_artifact_id, source.parsed_artifact_id = raw.id, artifact.id
+            source.size_bytes, source.content_sha256, source.status = (
+                raw.byte_count,
+                raw.content_sha256,
+                "ready",
+            )
+            source.source_metadata = dict(
+                source.source_metadata,
+                characters=len(parsed["text"]),
+                parser=parsed["parser"],
+                parser_revision=parsed["parser_revision"],
+                record_count=len(snapshot["raw"]["rows"]),
+                **{
+                    key: snapshot["raw"][key]
+                    for key in ("relation", "captured_at", "skipped_empty_records", "truncated", "ordering")
+                },
             )
 
     async def prepare(self, claim):

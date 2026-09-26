@@ -17,6 +17,7 @@ from .database import Store, scoped
 from .content import router as content_router
 from .runs import router as runs_router
 from .cancellation import router as cancellation_router
+from .connections import router as connections_router
 from .models import Configuration, Project
 from .present import present
 from .settings import Settings
@@ -68,6 +69,17 @@ def create_app(settings=None):
     @app.exception_handler(RequestValidationError)
     async def validation_handler(request, error):
         return JSONResponse({"error": Problem("VALIDATION_ERROR", "Check the request fields.").public()}, 422)
+
+    @app.exception_handler(TimeoutError)
+    async def timeout_handler(request, error):
+        return JSONResponse(
+            {
+                "error": Problem(
+                    "DATABASE_TIMEOUT", "The database operation exceeded its time limit."
+                ).public()
+            },
+            422,
+        )
 
     @app.exception_handler(Exception)
     async def internal_handler(request, error):
@@ -176,6 +188,7 @@ def create_app(settings=None):
     app.include_router(content_router)
     app.include_router(runs_router)
     app.include_router(cancellation_router)
+    app.include_router(connections_router)
     app.mount(
         "/",
         StaticFiles(

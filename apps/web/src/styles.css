@@ -1113,3 +1113,4 @@ dd {
     transition: none !important;
   }
 }
+.button-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.connection-form,.inspector-body label{display:grid;gap:8px}.connection-form{gap:16px}.column-table{width:100%;border-collapse:collapse;margin-top:16px;font-size:14px}.column-table th,.column-table td{padding:10px 4px;text-align:left;border-bottom:1px solid var(--border)}.column-table td span{display:block}.column-table input[type=checkbox]{width:18px;height:18px}.snapshot-preview article{padding:12px 0;border-top:1px solid var(--border)}.snapshot-preview pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit;font-size:14px}
