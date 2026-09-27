@@ -364,7 +364,7 @@ def main():
         checks.append("Standard OpenAPI validation passed")
     report = {
         "status":"passed",
-        "scope":"Implementation documentation, contracts and synthetic fixtures only; no application is implemented or benchmarked.",
+        "scope":"Implementation documentation, contracts and synthetic fixtures only; application checks are reported separately.",
         "schema_engine":engine,
         "standard_openapi_validation":standard_openapi,
         "implementation_documents":len(expected_docs),

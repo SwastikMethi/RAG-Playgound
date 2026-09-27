@@ -366,8 +366,8 @@ form {
   display: flex;
 }
 .rail {
-  width: 208px;
-  flex: 0 0 208px;
+  width: 196px;
+  flex: 0 0 196px;
   background: white;
   border-right: 1px solid var(--border);
   padding: 32px 20px;
@@ -398,7 +398,7 @@ form {
   font-weight: 650;
 }
 .workspace {
-  padding: 40px;
+  padding: 24px 32px;
   min-width: 0;
   flex: 1;
 }
@@ -406,7 +406,7 @@ form {
   display: flex;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 32px;
+  margin-bottom: 20px;
 }
 .panel {
   background: white;
@@ -496,12 +496,14 @@ form {
   color: #a43230;
 }
 .inspector {
-  width: 380px;
-  flex: 0 0 380px;
+  width: 400px;
   background: white;
   border-left: 1px solid var(--border);
-  position: sticky;
+  position: fixed;
+  right: 0;
   top: 0;
+  z-index: 30;
+  box-shadow: -8px 0 32px #192b371a;
   height: 100dvh;
   overflow: auto;
 }
@@ -611,8 +613,7 @@ form {
   min-width: 0;
 }
 .workspace-body > .inspector {
-  margin-top: -40px;
-  margin-right: -40px;
+  margin: 0;
 }
 .section-heading {
   display: flex;
@@ -742,14 +743,14 @@ summary .caption {
   border: 1px solid #b4cbc8;
   border-radius: 8px;
   padding: 16px;
-  margin-bottom: 32px;
-  gap: 12px;
+  margin-bottom: 20px;
+  gap: 8px;
   box-shadow: 0 2px 4px #192b3705;
 }
 .question-box textarea {
   border: 0;
   padding: 0;
-  min-height: 72px;
+  min-height: 48px;
   font-size: 16px;
 }
 .question-box > div {
@@ -771,8 +772,8 @@ summary .caption {
 }
 .answer-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 16px;
   align-items: start;
 }
 .answer-lane {
@@ -1001,7 +1002,7 @@ dd {
 }
 @media (min-width: 1600px) {
   .answer-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   }
 }
 @media (max-width: 1100px) {
@@ -1114,3 +1115,18 @@ dd {
   }
 }
 .button-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.connection-form,.inspector-body label{display:grid;gap:8px}.connection-form{gap:16px}.column-table{width:100%;border-collapse:collapse;margin-top:16px;font-size:14px}.column-table th,.column-table td{padding:10px 4px;text-align:left;border-bottom:1px solid var(--border)}.column-table td span{display:block}.column-table input[type=checkbox]{width:18px;height:18px}.snapshot-preview article{padding:12px 0;border-top:1px solid var(--border)}.snapshot-preview pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit;font-size:14px}
+
+/* Compact preparation keeps the question and answer as the primary reading path. */
+.page-heading h1{font-size:24px;margin-bottom:6px}.page-heading p{font-size:13px;margin-bottom:0}
+.comparison-setup{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:16px}
+.comparison-setup>summary{min-height:24px}.comparison-setup[open]>summary{margin-bottom:16px}.comparison-setup .selected-lanes{margin-bottom:0}
+.comparison-setup .technique-picker{padding:12px;margin-bottom:12px}.comparison-setup .setup-bar{margin-bottom:12px}
+.inspector-body .inline-check{display:flex;align-items:flex-start;gap:10px;font-size:14px}.inspector-body .inline-check input{flex:0 0 18px;margin-top:3px;padding:0}
+.inspector-body>p,.inspector-body>details{margin-bottom:16px}.form-actions{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}
+.lane-tools{flex-wrap:wrap;gap:10px}.lane-tools .button{margin-left:0;padding:4px 8px}.lane-tools .button:first-of-type{margin-left:auto}
+.lane-details form,.comparison-notes form{margin-top:16px;max-width:560px}.comparison-notes{margin-top:20px;border-top:1px solid var(--border);padding-top:16px}.comparison-notes>p{margin-top:12px}
+.fixture-run{color:var(--accent);margin-bottom:8px}.answer-text>*{max-width:76ch}.source-row{flex-wrap:wrap}.source-row .button{font-size:12px;padding:6px 10px}
+.inspector-body details>summary{padding:8px 0}.inspector-body details>label{margin-top:12px}.inspector-body h3,.source-preview{overflow-wrap:anywhere}
+.setup-status{max-width:800px}.setup-status>details{padding:12px 0;border-bottom:1px solid var(--border)}.setup-status>p{margin-bottom:12px}
+@media(max-width:700px){.rail nav button{font-size:12px;gap:5px}.rail nav button svg{width:15px;height:15px}}
+@media(max-width:700px){.rail{padding:12px 16px;gap:10px}.rail .brand{font-size:14px}.rail>.button{font-size:0;width:40px;min-width:40px;padding:8px}.rail .new-project{font-size:12px;order:0}.rail .new-project[open]{flex-basis:100%;order:4}.rail>label{order:2;gap:0}.rail>label>span{display:none}.rail nav{flex-basis:100%;order:3;gap:6px}.rail nav button{flex:1;justify-content:center;padding:8px}.workspace{padding:20px 16px}.page-heading{margin-bottom:16px}.source-name{flex-basis:120px}.source-row .status{margin-left:auto}.comparison-setup{padding:12px}.lane-tools{gap:8px}.question-box .caption{max-width:55%;font-size:12px}}

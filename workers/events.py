@@ -11,6 +11,7 @@ from app.models import Lane, Run, RunEvent
 from app.runs import TERMINAL
 from rag_runtime.contracts import canonical, validate
 from rag_runtime.errors import Problem
+from rag_runtime.operational import log_event
 
 
 def persist_event(s, store, run, lane_id, kind, payload, elapsed):
@@ -188,3 +189,20 @@ class RunWriter:
                     "The run reached its trace limit. Saved answers and terminal state are retained.",
                 )
             self.trace_bytes += persist_event(s, self.store, run, lane_id, kind, payload, elapsed)
+        if kind in {
+            "stage.completed",
+            "stage.failed",
+            "lane.completed",
+            "lane.failed",
+            "lane.cancelled",
+            "lane.timed_out",
+        }:
+            log_event(
+                kind,
+                job_id=self.claim["id"],
+                run_id=self.claim["resource_id"],
+                lane_id=lane_id,
+                stage=payload.get("stage"),
+                duration_ms=payload.get("duration_ms"),
+                error_code=payload.get("error", {}).get("code"),
+            )

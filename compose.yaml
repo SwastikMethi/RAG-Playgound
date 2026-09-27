@@ -2,7 +2,7 @@ name: ragplayground
 services:
   api:
     build: .
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
     ports: ["127.0.0.1:8780:8000"]
     env_file: .env
     environment:
@@ -10,9 +10,9 @@ services:
       RAG_QDRANT_URL: http://qdrant:6333
       RAG_ARTIFACT_ROOT: /data/artifacts
       RAG_PROFILES_PATH: /config/profiles.yaml
-    volumes: ["artifacts:/data/artifacts", "./config:/config:ro"]
+    volumes: ["artifacts:/data/artifacts", "./config:/config:ro", "models:/root/.cache"]
     depends_on:
-      postgres: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
       qdrant: {condition: service_started}
   worker:
     build: .
@@ -25,8 +25,16 @@ services:
       RAG_PROFILES_PATH: /config/profiles.yaml
     volumes: ["artifacts:/data/artifacts", "./config:/config:ro", "models:/root/.cache"]
     depends_on:
-      postgres: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
       qdrant: {condition: service_started}
+  migrate:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    env_file: .env
+    environment:
+      RAG_DATABASE_URL: postgresql+psycopg://rag:local-development-only@postgres/ragplayground
+    depends_on:
+      postgres: {condition: service_healthy}
   postgres:
     image: postgres:16-alpine
     environment: {POSTGRES_USER: rag, POSTGRES_PASSWORD: local-development-only, POSTGRES_DB: ragplayground}

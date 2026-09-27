@@ -1,17 +1,15 @@
 import asyncio
-import base64
 import json
 import time
-from datetime import datetime
 
 from fastapi import APIRouter, Header, Query, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy import and_, or_, select
+from sqlalchemy import select
 
 from rag_runtime import __version__
 from rag_runtime.chunking import token_count
 from rag_runtime.context import GROUNDING
-from rag_runtime.contracts import canonical, digest, request as check_request, validate
+from rag_runtime.contracts import digest, request as check_request, validate
 from rag_runtime.errors import Problem
 from rag_runtime.providers import empty_usage
 from rag_runtime.registry import check_config, preparation_identity
@@ -33,7 +31,7 @@ from .models import (
     RunEvent,
     Source,
 )
-from .present import present
+from .present import page_records, present
 
 router = APIRouter(prefix="/api/v1")
 TERMINAL = {"completed", "partial", "failed", "cancelled", "timed_out"}
@@ -96,6 +94,9 @@ def create_run(project_id: str, body: dict, request: Request, idempotency_key: s
         if prior:
             return present(s, scoped(s, Run, prior, project_id))
         corpus = scoped(s, Corpus, body["corpus_version_id"], project_id)
+        from .deletion import require_corpus_ready
+
+        require_corpus_ready(s, corpus)
         if body.get("parent_run_id"):
             scoped(s, Run, body["parent_run_id"], project_id)
         lanes, common = [], None
@@ -136,6 +137,7 @@ def create_run(project_id: str, body: dict, request: Request, idempotency_key: s
                 )
             lanes.append((config, bundle))
         run = Run(
+            mode=request.app.state.settings.mode,
             project_id=project_id,
             corpus_version_id=corpus.id,
             question=body["question"],
@@ -173,7 +175,7 @@ def history(
     project_id: str,
     request: Request,
     limit: int = Query(50, ge=1, le=100),
-    cursor: str | None = None,
+    cursor: str | None = Query(None, max_length=200),
     q: str = Query("", max_length=8000),
     status: str | None = None,
 ):
@@ -186,21 +188,7 @@ def history(
             query = query.where(Run.status == status)
         if q:
             query = query.where(Run.question.contains(q, autoescape=True))
-        if cursor:
-            try:
-                date, id = json.loads(base64.urlsafe_b64decode(cursor))
-                date = datetime.fromisoformat(date)
-            except (ValueError, TypeError):
-                raise Problem("INVALID_CURSOR", "The history cursor is invalid.", 400) from None
-            query = query.where(or_(Run.created_at < date, and_(Run.created_at == date, Run.id < id)))
-        rows = list(s.scalars(query.order_by(Run.created_at.desc(), Run.id.desc()).limit(limit + 1)))
-        items = rows[:limit]
-        next_cursor = (
-            base64.urlsafe_b64encode(canonical([items[-1].created_at.isoformat(), items[-1].id])).decode()
-            if len(rows) > limit
-            else None
-        )
-        return dict(items=[present(s, r) for r in items], next_cursor=next_cursor)
+        return page_records(s, query, Run, limit, cursor, descending=True)
 
 
 def event_dict(row):

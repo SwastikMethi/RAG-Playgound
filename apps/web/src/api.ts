@@ -40,7 +40,7 @@ export async function api<T>(
   if (!response.ok) {
     const value = await response.json().catch(() => null);
     throw new Error(
-      value?.error?.message || `Request failed (${response.status}).`,
+      value?.error?.message ? `${value.error.message}${value.error.details?.field ? ` Field: ${value.error.details.field}.` : ""}` : `Request failed (${response.status}).`,
     );
   }
   return response.status === 204 ? (undefined as T) : response.json();
@@ -51,4 +51,27 @@ export function post<T>(path: string, body: unknown, idempotent = false) {
     body: JSON.stringify(body),
     headers: idempotent ? { "Idempotency-Key": crypto.randomUUID() } : {},
   });
+}
+
+export async function apiAll<T>(path: string): Promise<{ items: T[] }> {
+  // ponytail: owner-sized pickers load all records; virtualize if their measured size becomes costly.
+  const items: T[] = [];
+  let cursor: string | null = null;
+  do {
+    const page: { items: T[]; next_cursor: string | null } = await api(`${path}?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`);
+    items.push(...page.items);
+    cursor = page.next_cursor;
+  } while (cursor);
+  return { items };
+}
+
+export async function downloadFile(path: string, filename: string) {
+  const response = await fetch(path, { headers: headers() });
+  if (!response.ok) throw new Error("Download failed. Check that the file is still available.");
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = response.headers.get("content-disposition")?.match(/filename="([^"]+)"/)?.[1] || filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

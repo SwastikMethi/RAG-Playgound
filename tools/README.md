@@ -11,4 +11,4 @@ When installed, jsonschema and openapi-spec-validator add standards-based valida
 
 VALIDATION_REPORT.json records the checks actually performed when the pack was prepared. It does not claim that any application, provider, retrieval implementation or exported app has been run.
 
-Application tests described in docs/11_ACCEPTANCE_TESTS.md must be implemented separately by Codex.
+Application checks run separately with `uv run pytest`, `npm test` and `npm run test:e2e`. See `IMPLEMENTATION_STATUS.md` for their results and live-provider verification.

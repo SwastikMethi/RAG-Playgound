@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { api, post, headers, type Lane } from "./api";
+import { api, post, downloadFile, type Lane } from "./api";
 import type { components } from "./generated/api";
 import { Button, ErrorNotice, Status } from "./ui";
 type Export = components["schemas"]["Export"];
 
-export function ExportPanel({ runId, lane }: { runId: string; lane: Lane }) {
+export function ExportPanel({ runId, lane, fixture }: { runId: string; lane: Lane; fixture: boolean }) {
   const [includeData, setIncludeData] = useState(false);
   const [live, setLive] = useState(false);
   const [item, setItem] = useState<Export | null>(null);
@@ -30,12 +30,7 @@ export function ExportPanel({ runId, lane }: { runId: string; lane: Lane }) {
     if (!item?.download_url) return;
     setError(""); setBusy(true);
     try {
-      const response = await fetch(item.download_url, { headers: headers() });
-      if (!response.ok) throw new Error("Download failed. Check that the export is still available.");
-      const url = URL.createObjectURL(await response.blob());
-      const link = document.createElement("a");
-      link.href = url; link.download = "rag-implementation.zip"; link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      await downloadFile(item.download_url, "rag-implementation.zip");
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
   }
@@ -45,8 +40,8 @@ export function ExportPanel({ runId, lane }: { runId: string; lane: Lane }) {
     <p className="caption">Download a standalone Python application with this pipeline’s settings, shared runtime, dependency lock and setup commands.</p>
     <label className="inline-check"><input type="checkbox" checked={includeData} disabled={working} onChange={(e) => setIncludeData(e.target.checked)} /> Include source snapshots</label>
     <p className="caption">{includeData ? "The ZIP will contain the exact selected documents or captured database rows. Treat the download as private." : "The ZIP contains code and source hashes. Supply your files again under the listed aliases; original names, questions and answers are omitted."}</p>
-    <label className="inline-check"><input type="checkbox" checked={live} disabled={working} onChange={(e) => setLive(e.target.checked)} /> Also run a live verification</label>
-    <p className="caption">{live ? "This makes a new answer-model call, a query embedding for vector techniques, and up to the saved tree call budget for PageIndex. It reuses the prepared source index. Provider charges may apply; future answers can differ." : "Offline replay uses recorded external responses. It makes no new model calls and does not verify live provider performance."}</p>
+    <label className="inline-check"><input type="checkbox" checked={live} disabled={working || fixture} onChange={(e) => setLive(e.target.checked)} /> Also run a live verification</label>
+    <p className="caption">{fixture ? "This saved run uses fixture responses. Live verification is available for live runs." : live ? "This makes a new answer-model call, a query embedding for vector techniques, and up to the saved tree call budget for PageIndex. It reuses the prepared source index. Provider charges may apply; future answers can differ." : "Offline replay uses recorded external responses. It makes no new model calls and does not verify live provider performance."}</p>
     {error && <ErrorNotice message={error} />}
     {item?.error && <ErrorNotice message={item.error.message} />}
     <div className="form-actions"><Button tone="primary" disabled={working} onClick={build}>{working ? "Building export…" : "Build export"}</Button>

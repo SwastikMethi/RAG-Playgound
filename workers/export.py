@@ -111,11 +111,12 @@ class PackageTest(unittest.TestCase):
         self.assertEqual(static_check(Path(__file__).resolve().parents[1])["status"], "passed")
 """
     files["Dockerfile"] = """FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends libglib2.0-0 libgl1 libgomp1 && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY . .
 RUN uv sync --frozen --all-extras --no-dev
 EXPOSE 8000
-CMD ["uv", "run", "--no-sync", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "--no-sync", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
 """
     files[".dockerignore"] = ".env\n.venv\n__pycache__\n.rag\n"
     compose = dict(

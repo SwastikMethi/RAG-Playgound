@@ -98,7 +98,15 @@ class VectorStore:
                 )
                 for chunk, vector in zip(chunks[start : start + 128], vectors[start : start + 128])
             ]
-            await asyncio.to_thread(self.client.upsert, collection, points=points, wait=True)
+            writing = asyncio.create_task(
+                asyncio.to_thread(self.client.upsert, collection, points=points, wait=True)
+            )
+            try:
+                await asyncio.shield(writing)
+            except asyncio.CancelledError:
+                # A thread cannot be cancelled. Finish the bounded write before its owner deletes this scope.
+                await writing
+                raise
 
     async def search(self, scope: Scope, vector, limit, settings):
         filter = require_scope(scope)

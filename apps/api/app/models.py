@@ -118,6 +118,7 @@ class Run(Identity, Base):
     __table_args__ = (Index("ix_runs_project_created", "project_id", "created_at"),)
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"))
     corpus_version_id: Mapped[str] = mapped_column(ForeignKey("corpus_versions.id"))
+    mode: Mapped[str] = mapped_column(String(20), default="live", server_default="live")
     question: Mapped[str] = mapped_column(Text)
     parent_run_id: Mapped[str | None] = mapped_column(ForeignKey("runs.id", ondelete="SET NULL"))
     status: Mapped[str] = mapped_column(String(20), default="queued")

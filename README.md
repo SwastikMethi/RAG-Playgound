@@ -1,11 +1,38 @@
-# RAG Playground implementation pack
+# RAG Playground
 
-Prepared for the product owner and the coding agent implementing the product.
-Specification version 1.1.0. Updated 26 September 2026.
+A private, self-hosted workspace for comparing six retrieval techniques against your documents and PostgreSQL text snapshots. Ask once, inspect independent streamed answers, replay measured execution steps, leave feedback and export a standalone implementation.
+
+## Run locally
+
+Requires Python 3.12, uv, Node 22+ and Docker Compose. From this directory:
+
+```sh
+uv sync --frozen --all-extras
+uv run python tools/init_env.py
+```
+
+Set `OPENAI_API_KEY` in the ignored `.env`. It already contains generated application and encryption keys. The default profiles use `https://api.openai.com/v1`, `gpt-4.1-mini-2025-04-14` and `text-embedding-3-small`. Keep secrets out of `.env.example`.
+
+```sh
+docker compose -f compose.yaml -f compose.dev.yaml up -d postgres qdrant
+uv run alembic upgrade head
+uv run python tools/prepare_models.py --reranker --pdf
+npm ci
+npm run build
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8780 --no-access-log
+```
+
+In another terminal, run `uv run python -m workers.main`. Open **http://127.0.0.1:8780** and enter `RAG_APP_TOKEN` from your local `.env`. Create a project, upload sources, freeze a corpus, select techniques and prepare them before asking. `RAG_MODE=fixture` on **both** processes enables a visibly labeled synthetic demonstration.
+
+For the full container setup, PostgreSQL connection policy, backups, limits and troubleshooting, see [running the application](docs/17_RUNNING_THE_APPLICATION.md). See [implementation status](IMPLEMENTATION_STATUS.md) for checks actually performed and remaining limitations.
+
+## Specification pack
+
+The original implementation specification is retained below. Its fictional answers, traces and timings under `fixtures/` and `contracts/examples/` are examples, separate from measured application runs.
 
 Build a live playground in which a user supplies documents or a supported database snapshot, selects retrieval techniques, asks one question, compares streamed answers and elapsed time, inspects visual execution traces, and exports a runnable implementation of a selected configuration. The user judges which answer is useful. A mandatory benchmark dataset, an automatic quality leaderboard, and an automatic winner are outside this release.
 
-This archive contains implementation specifications and synthetic development fixtures. It is not an implemented application. Its sample answers, traces, timings, and identifiers are examples, not measured performance.
+This repository contains the application, implementation specifications and synthetic development fixtures.
 
 Revision 1.1.0 adds required design standards for a mature, uncluttered interface and clear step-by-step simulations, with implementation tasks and visual review gates. API and event contract versions remain unchanged.
 

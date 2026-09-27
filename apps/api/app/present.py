@@ -1,10 +1,43 @@
 """Only contract fields leave the API; database and secret fields are private."""
 
-from fastapi.encoders import jsonable_encoder
-from sqlalchemy import select
+import base64
+import json
+from datetime import datetime
 
-from rag_runtime.contracts import schema_file, validate
+from fastapi.encoders import jsonable_encoder
+from sqlalchemy import select, and_, or_
+
+from rag_runtime.contracts import canonical, schema_file, validate
+from rag_runtime.errors import Problem
 from . import models as m
+
+
+def page_records(session, query, model, limit, cursor, descending=False):
+    if cursor:
+        try:
+            date, id = json.loads(base64.urlsafe_b64decode(cursor))
+            date = datetime.fromisoformat(date)
+            if not date.tzinfo or not isinstance(id, str) or not 1 <= len(id) <= 80:
+                raise ValueError()
+        except (ValueError, TypeError):
+            raise Problem("INVALID_CURSOR", "The collection cursor is invalid.", 400) from None
+        query = query.where(
+            or_(
+                model.created_at < date if descending else model.created_at > date,
+                and_(model.created_at == date, model.id < id if descending else model.id > id),
+            )
+        )
+    order = [model.created_at.desc(), model.id.desc()] if descending else [model.created_at, model.id]
+    rows = list(session.scalars(query.order_by(*order).limit(limit + 1)))
+    items = rows[:limit]
+    return dict(
+        items=[present(session, row) for row in items],
+        next_cursor=base64.urlsafe_b64encode(
+            canonical([items[-1].created_at.isoformat(), items[-1].id])
+        ).decode()
+        if len(rows) > limit
+        else None,
+    )
 
 
 def present(session, obj):

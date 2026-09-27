@@ -23,7 +23,7 @@ from .models import (
     Project,
     Source,
 )
-from .present import present
+from .present import page_records, present
 
 router = APIRouter(prefix="/api/v1")
 
@@ -66,17 +66,15 @@ def enqueue(s, project, kind, resource):
 
 
 @router.get("/projects/{project_id}/sources")
-def sources(project_id: str, request: Request):
+def sources(
+    project_id: str,
+    request: Request,
+    limit: int = Query(50, ge=1, le=100),
+    cursor: str | None = Query(None, max_length=200),
+):
     with request.app.state.store.session() as s:
         scoped(s, Project, project_id)
-        return dict(
-            items=[
-                present(s, row)
-                for row in s.scalars(
-                    select(Source).where(Source.project_id == project_id).order_by(Source.created_at)
-                )
-            ]
-        )
+        return page_records(s, select(Source).where(Source.project_id == project_id), Source, limit, cursor)
 
 
 @router.post("/projects/{project_id}/sources/upload", status_code=202)
@@ -225,16 +223,16 @@ def create_corpus(project_id: str, body: dict, request: Request):
 
 
 @router.get("/projects/{project_id}/corpus-versions")
-def corpora(project_id: str, request: Request):
+def corpora(
+    project_id: str,
+    request: Request,
+    limit: int = Query(50, ge=1, le=100),
+    cursor: str | None = Query(None, max_length=200),
+):
     with request.app.state.store.session() as s:
         scoped(s, Project, project_id)
-        return dict(
-            items=[
-                present(s, c)
-                for c in s.scalars(
-                    select(Corpus).where(Corpus.project_id == project_id).order_by(Corpus.ordinal.desc())
-                )
-            ]
+        return page_records(
+            s, select(Corpus).where(Corpus.project_id == project_id), Corpus, limit, cursor, descending=True
         )
 
 
@@ -255,6 +253,9 @@ def prepare(project_id: str, body: dict, request: Request, idempotency_key: str 
             return present(s, scoped(s, IndexBundle, existing, project_id))
         config = scoped(s, Configuration, body["config_id"], project_id)
         corpus = scoped(s, Corpus, body["corpus_version_id"], project_id)
+        from .deletion import require_corpus_ready
+
+        require_corpus_ready(s, corpus)
         check_config(config.config, request.app.state.profiles)
         if config.config["technique"] == "pageindex":
             sources = list(

@@ -1,0 +1,12 @@
+.git
+.env
+.env.*
+.venv
+node_modules
+.data
+.cache
+.superpowers
+test-results
+playwright-report
+**/__pycache__
+apps/web/dist

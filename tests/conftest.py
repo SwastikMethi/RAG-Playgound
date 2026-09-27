@@ -16,11 +16,15 @@ TEST_URL = os.environ.get(
 def database_schema(request):
     if not any(item.get_closest_marker("integration") for item in request.session.items):
         return
+    prepare_database(TEST_URL)
+
+
+def prepare_database(database_url):
     import psycopg
     from psycopg import sql
     from sqlalchemy.engine import make_url
 
-    url = make_url(TEST_URL)
+    url = make_url(database_url)
     assert url.database.endswith("_test"), "Integration tests require a dedicated *_test database."
     with psycopg.connect(
         host=url.host,
@@ -34,7 +38,7 @@ def database_schema(request):
             conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(url.database)))
     env = dict(
         os.environ,
-        RAG_DATABASE_URL=TEST_URL,
+        RAG_DATABASE_URL=database_url,
         PYTHONPATH=str(Path("packages").resolve()) + os.pathsep + str(Path("apps/api").resolve()),
     )
     subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], env=env, check=True)

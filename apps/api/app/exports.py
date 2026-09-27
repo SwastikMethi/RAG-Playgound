@@ -7,7 +7,7 @@ from rag_runtime.contracts import request as check_request
 from rag_runtime.errors import Problem
 from .content import idempotent, remember
 from .database import scoped
-from .models import Artifact, Export, Job, Lane, Project, Run
+from .models import Artifact, Corpus, Export, Job, Lane, Project, Run
 from .present import present
 
 router = APIRouter(prefix="/api/v1")
@@ -27,7 +27,16 @@ def create_export(
     store = request.app.state.store
     with store.session() as s:
         run = scoped(s, Run, run_id)
+        if body["verification_mode"] == "live" and run.mode != "live":
+            raise Problem(
+                "LIVE_UNAVAILABLE",
+                "This saved run is a fixture demonstration. Its export can only be verified offline.",
+                409,
+            )
         scoped(s, Project, run.project_id, lock=True)
+        from .deletion import require_corpus_ready
+
+        require_corpus_ready(s, scoped(s, Corpus, run.corpus_version_id, run.project_id))
         lane = s.scalar(select(Lane).where(Lane.id == lane_id, Lane.run_id == run_id))
         if not lane:
             raise Problem("NOT_FOUND", "The lane is not part of this run.", 404)

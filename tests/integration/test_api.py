@@ -28,22 +28,27 @@ def client(tmp_path):
     with TestClient(create_app(settings)) as c:
         c.headers["Authorization"] = f"Bearer {TOKEN}"
         send = c.request
+
         def checked(method, url, *args, **kwargs):
             response = send(method, url, *args, **kwargs)
-            path = urlsplit(str(url)).path.removeprefix('/api/v1')
-            for template, operations in schema_file('openapi.yaml')['paths'].items():
-                if not re.fullmatch(re.sub(r'\{[^}]+\}', '[^/]+', template), path):
+            path = urlsplit(str(url)).path.removeprefix("/api/v1")
+            for template, operations in schema_file("openapi.yaml")["paths"].items():
+                if not re.fullmatch(re.sub(r"\{[^}]+\}", "[^/]+", template), path):
                     continue
                 operation = operations.get(method.lower())
                 if not operation:
                     break
                 status = str(response.status_code)
-                assert status in operation['responses'], f'{method} {path}: undeclared status {status}'
-                if 'application/json' in response.headers.get('content-type', ''):
-                    escaped = template.replace('~','~0').replace('/','~1')
-                    validator('openapi.yaml', pointer=f'/paths/{escaped}/{method.lower()}/responses/{status}/content/application~1json/schema').validate(response.json())
+                assert status in operation["responses"], f"{method} {path}: undeclared status {status}"
+                if "application/json" in response.headers.get("content-type", ""):
+                    escaped = template.replace("~", "~0").replace("/", "~1")
+                    validator(
+                        "openapi.yaml",
+                        pointer=f"/paths/{escaped}/{method.lower()}/responses/{status}/content/application~1json/schema",
+                    ).validate(response.json())
                 break
             return response
+
         c.request = checked
         yield c
 
@@ -70,6 +75,38 @@ def test_auth_contracts_and_immutable_configuration(client):
     assert first["revision"] == 1 and second["revision"] == 2 and first["family_id"] == second["family_id"]
     assert client.get(f"/api/v1/configurations/{first['id']}").json()["name"] == "Lexical"
     assert validate(second, "openapi.yaml", "Configuration")
+
+
+def test_collection_pagination_contracts_and_scopes(client):
+    from app.models import Source, Corpus, CorpusSource, Configuration
+    from rag_runtime.contracts import digest
+    from rag_runtime.registry import defaults
+
+    project = client.post("/api/v1/projects", json={"name": "Pagination"}).json()["id"]
+    config = defaults("bm25", client.app.state.profiles)
+    with client.app.state.store.session() as s:
+        for i in range(3):
+            source = Source(project_id=project, display_name=f"source-{i}", kind="file", source_metadata={})
+            corpus = Corpus(project_id=project, ordinal=i + 1, content_fingerprint=digest(str(i)))
+            s.add_all([source, corpus])
+            s.flush()
+            s.add(CorpusSource(corpus_version_id=corpus.id, source_id=source.id, ordinal=0))
+            s.add(
+                Configuration(
+                    project_id=project, name=f"config-{i}", config=config, config_sha256=digest(config)
+                )
+            )
+    for suffix in ["sources", "corpus-versions", "configurations"]:
+        path = f"/api/v1/projects/{project}/{suffix}"
+        first = client.get(path, params={"limit": 2}).json()
+        assert len(first["items"]) == 2 and first["next_cursor"]
+        last = client.get(path, params={"limit": 2, "cursor": first["next_cursor"]}).json()
+        assert len(last["items"]) == 1 and last["next_cursor"] is None
+        assert not {r["id"] for r in first["items"]} & {r["id"] for r in last["items"]}
+        assert all(r["project_id"] == project for r in first["items"] + last["items"])
+        assert client.get(path, params={"cursor": "invalid"}).status_code == 400
+    projects = client.get("/api/v1/projects", params={"limit": 1}).json()
+    assert len(projects["items"]) == 1 and projects["next_cursor"]
 
 
 def test_bm25_upload_prepare_ask_replay_and_no_evidence(client):

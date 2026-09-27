@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, post, type Source } from "./api";
+import { api, apiAll, post, type Source } from "./api";
 import type { components } from "./generated/api";
 import { Button, ErrorNotice } from "./ui";
 
@@ -37,7 +37,7 @@ export function PostgresSource({
     [jobId, setJobId] = useState("");
   const [add, setAdd] = useState(false);
   async function load() {
-    const result = await api<{ items: Connection[] }>(
+    const result = await apiAll<Connection>(
       `/projects/${project}/connections`,
     );
     setConnections(result.items);

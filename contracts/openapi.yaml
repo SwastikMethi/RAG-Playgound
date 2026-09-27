@@ -15,6 +15,18 @@ paths:
       operationId: getHealth
       summary: Process liveness
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -69,6 +81,18 @@ paths:
       operationId: listProjects
       summary: List projects
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -155,6 +179,18 @@ paths:
       operationId: createProject
       summary: Create a project
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -214,6 +250,18 @@ paths:
       operationId: getProject
       summary: Read project metadata
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -275,6 +323,18 @@ paths:
       operationId: listSources
       summary: List immutable source revisions
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -351,6 +411,18 @@ paths:
       operationId: uploadSource
       summary: Upload one supported file
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -415,6 +487,18 @@ paths:
       operationId: getSource
       summary: Read source state
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -472,6 +556,18 @@ paths:
       operationId: deleteSource
       summary: Delete source and confirmed dependent content
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -540,6 +636,18 @@ paths:
       operationId: getSourceContent
       summary: Read protected source preview
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -618,6 +726,18 @@ paths:
       operationId: getSourceFile
       summary: Read authorized original source bytes
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -685,6 +805,18 @@ paths:
       operationId: getSourceImpact
       summary: Inspect source deletion impact
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -743,6 +875,18 @@ paths:
       operationId: listConnections
       summary: List sanitized database connections
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -818,6 +962,18 @@ paths:
       operationId: createConnection
       summary: Store an encrypted PostgreSQL connection
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -882,6 +1038,18 @@ paths:
       operationId: getConnection
       summary: Read sanitized connection metadata
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -939,6 +1107,18 @@ paths:
       operationId: deleteConnection
       summary: Remove connection credentials; preserve captured snapshots
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -993,6 +1173,18 @@ paths:
       operationId: listRelations
       summary: List allowed relations and selectable columns
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -1060,6 +1252,18 @@ paths:
       operationId: capturePostgres
       summary: Capture a bounded PostgreSQL text snapshot
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -1124,6 +1328,18 @@ paths:
       operationId: createCorpus
       summary: Freeze ready source membership
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -1187,6 +1403,18 @@ paths:
       operationId: listCorpora
       summary: List frozen corpus versions
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -1263,6 +1491,18 @@ paths:
       operationId: getCorpus
       summary: Read a frozen corpus version
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -1321,6 +1561,18 @@ paths:
       operationId: listConfigurations
       summary: List configuration revisions
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -1396,6 +1648,18 @@ paths:
       operationId: saveConfiguration
       summary: Create an immutable configuration revision
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -1460,6 +1724,18 @@ paths:
       operationId: getConfiguration
       summary: Read one immutable configuration
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -1518,6 +1794,18 @@ paths:
       operationId: prepareConfiguration
       summary: Prepare or reuse an index bundle
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -1590,6 +1878,18 @@ paths:
       operationId: getIndexBundle
       summary: Read readiness and setup metrics
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -1648,6 +1948,18 @@ paths:
       operationId: createRun
       summary: Fan one question into selected ready lanes
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -1719,6 +2031,18 @@ paths:
       operationId: listRuns
       summary: List comparison history
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -1813,6 +2137,18 @@ paths:
       operationId: getRun
       summary: Read an atomic run snapshot
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -1871,6 +2207,18 @@ paths:
       operationId: streamRunEvents
       summary: Stream durable trace frames
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -1948,6 +2296,18 @@ paths:
       operationId: cancelRun
       summary: Request cancellation of all unfinished lanes
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -2006,6 +2366,18 @@ paths:
       operationId: cancelLane
       summary: Request cancellation of one lane
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -2068,6 +2440,18 @@ paths:
       operationId: getLaneEvidence
       summary: Inspect protected evidence
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -2130,6 +2514,18 @@ paths:
       operationId: saveFeedback
       summary: Save manual lane feedback
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -2198,6 +2594,18 @@ paths:
       operationId: savePreference
       summary: Save a preferred lane or tie
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -2262,6 +2670,18 @@ paths:
       operationId: createExport
       summary: Build a portable implementation
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -2338,6 +2758,18 @@ paths:
       operationId: getExport
       summary: Read export state and verification
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -2396,6 +2828,18 @@ paths:
       operationId: downloadExport
       summary: Download authorized ready archive
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -2455,6 +2899,18 @@ paths:
       operationId: getCapabilities
       summary: Read technique registry and availability
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -2524,6 +2980,18 @@ paths:
       operationId: getProfiles
       summary: Read public provider metadata
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -2586,6 +3054,18 @@ paths:
       operationId: getJob
       summary: Read job progress
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -2645,6 +3125,18 @@ paths:
       summary: Check required storage readiness
       parameters: []
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -2706,6 +3198,18 @@ paths:
           minLength: 1
           maxLength: 128
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -2764,6 +3268,18 @@ paths:
         required: true
         schema: *id004
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -2836,6 +3352,18 @@ paths:
         required: true
         schema: *id004
       responses:
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
           content:
@@ -3755,6 +4283,9 @@ components:
         id: *id001
         project_id: *id001
         corpus_version_id: *id001
+        mode:
+          type: string
+          enum: [live, fixture, test]
         question:
           type: string
           minLength: 1
@@ -3802,6 +4333,7 @@ components:
       - project_id
       - corpus_version_id
       - question
+      - mode
       - parent_run_id
       - status
       - created_at

@@ -20,6 +20,10 @@ def unavailable_reason(config):
         return "Choose the packaged, pinned MiniLM reranker revision."
     if config["max_input_tokens"] > 512:
         return "This cross-encoder supports at most 512 scoring tokens."
+    from importlib.util import find_spec
+
+    if find_spec("sentence_transformers") is None:
+        return "Install the rerank optional dependency group before using the cross-encoder."
     from huggingface_hub import try_to_load_from_cache
 
     cached = try_to_load_from_cache(MODEL, "model.safetensors", revision=REVISION)

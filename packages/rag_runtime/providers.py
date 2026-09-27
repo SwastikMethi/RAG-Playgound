@@ -18,6 +18,7 @@ from .contracts import digest
 from .errors import Problem
 from .chunking import token_count, lexical_tokens
 from .vectors import check_vectors
+from .network import resolve_host
 
 
 class Profile(BaseModel):
@@ -185,6 +186,17 @@ class Gateway:
             )
         return self._semaphores[key]
 
+    async def endpoint(self, profile):
+        url = httpx.URL(profile.base_url.rstrip("/"))
+        if self.transport is not None:
+            return dict(url=url, headers={}, extensions={})  # Explicit isolated test transport.
+        address = await resolve_host(url.host, [url.host])
+        return dict(
+            url=url.copy_with(host=address),
+            headers={"Host": url.netloc.decode()},
+            extensions={"sni_hostname": url.host},
+        )
+
     async def complete(self, profile, messages, *, max_tokens=512, json_mode=False, retries=0):
         """Bounded non-streaming model boundary for selection and SDK indexing."""
         if profile.unavailable_reason:
@@ -213,6 +225,7 @@ class Gateway:
             async with self.semaphore(profile, "model"):
                 wait += (time.monotonic() - began) * 1000
                 try:
+                    endpoint = await self.endpoint(profile)
                     async with httpx.AsyncClient(
                         transport=self.transport,
                         timeout=httpx.Timeout(90, connect=10),
@@ -220,8 +233,9 @@ class Gateway:
                         trust_env=False,
                     ) as client:
                         response = await client.post(
-                            profile.base_url.rstrip("/") + "/chat/completions",
-                            headers={"Authorization": f"Bearer {profile.key}"},
+                            str(endpoint["url"]) + "/chat/completions",
+                            headers={**endpoint["headers"], "Authorization": f"Bearer {profile.key}"},
+                            extensions=endpoint["extensions"],
                             json=payload,
                         )
                         response.raise_for_status()
@@ -298,12 +312,14 @@ class Gateway:
                         reported = False
                         break
                     try:
+                        endpoint = await self.endpoint(profile)
                         async with httpx.AsyncClient(
                             transport=self.transport, timeout=90, follow_redirects=False, trust_env=False
                         ) as client:
                             response = await client.post(
-                                profile.base_url.rstrip("/") + "/embeddings",
-                                headers={"Authorization": f"Bearer {profile.key}"},
+                                str(endpoint["url"]) + "/embeddings",
+                                headers={**endpoint["headers"], "Authorization": f"Bearer {profile.key}"},
+                                extensions=endpoint["extensions"],
                                 json=dict(model=profile.model, input=batch, encoding_format="float"),
                             )
                             response.raise_for_status()
@@ -381,6 +397,7 @@ class Gateway:
                 if generation["seed"] is not None and profile.supports_seed:
                     payload["seed"] = generation["seed"]
                 try:
+                    endpoint = await self.endpoint(profile)
                     async with httpx.AsyncClient(
                         transport=self.transport,
                         timeout=httpx.Timeout(90, connect=10),
@@ -389,8 +406,9 @@ class Gateway:
                     ) as client:
                         async with client.stream(
                             "POST",
-                            profile.base_url.rstrip("/") + "/chat/completions",
-                            headers={"Authorization": f"Bearer {profile.key}"},
+                            str(endpoint["url"]) + "/chat/completions",
+                            headers={**endpoint["headers"], "Authorization": f"Bearer {profile.key}"},
+                            extensions=endpoint["extensions"],
                             json=payload,
                         ) as response:
                             response.raise_for_status()

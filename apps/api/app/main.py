@@ -1,7 +1,9 @@
 import hmac
+import time
+from uuid import uuid4
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -11,6 +13,7 @@ from sqlalchemy import func, select, text
 from rag_runtime import __version__
 from rag_runtime.contracts import digest, request as check_request
 from rag_runtime.errors import Problem
+from rag_runtime.operational import log_event
 from rag_runtime.providers import load_profiles
 from rag_runtime.registry import capabilities, check_config
 from .database import Store, scoped
@@ -19,9 +22,11 @@ from .runs import router as runs_router
 from .cancellation import router as cancellation_router
 from .connections import router as connections_router
 from .exports import router as exports_router
+from .deletion import router as deletion_router
 from .models import Configuration, Project
-from .present import present
+from .present import page_records, present
 from .settings import Settings
+from .security import BoundedBody
 
 
 def create_app(settings=None):
@@ -38,6 +43,7 @@ def create_app(settings=None):
 
     @app.middleware("http")
     async def boundary(request: Request, call_next):
+        started, request_id = time.monotonic(), str(uuid4())
         path = request.url.path
         token = app.state.settings.app_token.get_secret_value()
         if path.startswith("/api/") and path != "/api/v1/health":
@@ -53,8 +59,18 @@ def create_app(settings=None):
                     403,
                 )
         response = await call_next(request)
+        if path.startswith("/api/"):
+            log_event(
+                "http",
+                request_id=request_id,
+                route=getattr(request.scope.get("route"), "path", "unmatched"),
+                method=request.method,
+                status=response.status_code,
+                duration_ms=round((time.monotonic() - started) * 1000, 2),
+            )
         response.headers.update(
             {
+                "X-Request-ID": request_id,
                 "X-Content-Type-Options": "nosniff",
                 "Referrer-Policy": "no-referrer",
                 "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
@@ -62,6 +78,8 @@ def create_app(settings=None):
             }
         )
         return response
+
+    app.add_middleware(BoundedBody)
 
     @app.exception_handler(Problem)
     async def problem_handler(request, error):
@@ -101,8 +119,13 @@ def create_app(settings=None):
     @app.get("/api/v1/system/readiness")
     def readiness():
         try:
+            from alembic.config import Config
+            from alembic.script import ScriptDirectory
+
             with app.state.store.session() as s:
-                s.execute(text("SELECT 1 FROM alembic_version"))
+                versions = set(s.scalars(text("SELECT version_num FROM alembic_version")))
+                if versions != set(ScriptDirectory.from_config(Config("alembic.ini")).get_heads()):
+                    raise RuntimeError("Migrations pending")
             probe = app.state.store.root / ".readiness"
             probe.write_text("")
             probe.unlink()
@@ -120,11 +143,9 @@ def create_app(settings=None):
         return capabilities(app.state.profiles, app.state.settings)
 
     @app.get("/api/v1/projects")
-    def projects():
+    def projects(limit: int = Query(50, ge=1, le=100), cursor: str | None = Query(None, max_length=200)):
         with app.state.store.session() as s:
-            return dict(
-                items=[present(s, p) for p in s.scalars(select(Project).order_by(Project.created_at))]
-            )
+            return page_records(s, select(Project), Project, limit, cursor)
 
     @app.post("/api/v1/projects", status_code=201)
     def create_project(body: dict):
@@ -143,18 +164,19 @@ def create_app(settings=None):
             return present(s, scoped(s, Project, project_id))
 
     @app.get("/api/v1/projects/{project_id}/configurations")
-    def configurations(project_id: str):
+    def configurations(
+        project_id: str,
+        limit: int = Query(50, ge=1, le=100),
+        cursor: str | None = Query(None, max_length=200),
+    ):
         with app.state.store.session() as s:
             scoped(s, Project, project_id)
-            return dict(
-                items=[
-                    present(s, c)
-                    for c in s.scalars(
-                        select(Configuration)
-                        .where(Configuration.project_id == project_id)
-                        .order_by(Configuration.created_at)
-                    )
-                ]
+            return page_records(
+                s,
+                select(Configuration).where(Configuration.project_id == project_id),
+                Configuration,
+                limit,
+                cursor,
             )
 
     @app.post("/api/v1/projects/{project_id}/configurations", status_code=201)
@@ -191,6 +213,7 @@ def create_app(settings=None):
     app.include_router(cancellation_router)
     app.include_router(connections_router)
     app.include_router(exports_router)
+    app.include_router(deletion_router)
     app.mount(
         "/",
         StaticFiles(

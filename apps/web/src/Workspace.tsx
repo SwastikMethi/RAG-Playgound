@@ -1,3 +1,4 @@
+import type { components } from "./generated/api";
 import {
   useCallback,
   useEffect,
@@ -16,11 +17,13 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   api,
+  apiAll,
   post,
+  downloadFile,
   type Bundle,
   type Capability,
   type Configuration,
@@ -41,12 +44,15 @@ import {
   type TraceEvent,
 } from "./reducer";
 import { streamEvents } from "./stream";
+import { DeleteSource } from "./DeleteSource";
+import { LaneFeedback, RunPreference } from "./Judgement";
 import { ExportPanel } from "./ExportPanel";
 import { PostgresSource } from "./PostgresSource";
 import { Workflow, StepInspector, LiveDuration } from "./Workflow";
 
 type View = "playground" | "sources" | "history";
 type Inspection =
+  | { kind: "delete"; source: Source }
   | { kind: "export"; lane: Lane; runId: string }
   | { kind: "postgres"; source?: Source }
   | { kind: "source"; source: Source }
@@ -59,6 +65,14 @@ const ms = (n: number | null | undefined) =>
     : n < 1000
       ? `${Math.round(n)} ms`
       : `${(n / 1000).toFixed(2)} s`;
+
+// Stable component identities preserve citation focus as new events render.
+const answerComponents: Components = {
+  img: () => null,
+  a: ({ href, children }) => href?.startsWith("#evidence-")
+    ? <button className="citation" data-citation={href.slice(10)}>{children}</button>
+    : <span>{children}</span>,
+};
 
 export function Workspace({
   project,
@@ -86,6 +100,12 @@ export function Workspace({
   const [run, setRun] = useState<Run | null>(null),
     [history, setHistory] = useState<Run[]>([]),
     [historyQuery, setHistoryQuery] = useState("");
+  const [historyStatus, setHistoryStatus] = useState("");
+  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+  const [setupOpen, setSetupOpen] = useState(true);
+  const [connectionAttempt, setConnectionAttempt] = useState(0);
+  const [disconnected, setDisconnected] = useState(false);
+  useEffect(() => { if (run) setSetupOpen(false); }, [run?.id]);
   const [playback, setPlayback] = useState<Playback | null>(null),
     [connected, setConnected] = useState(false),
     [mobileLane, setMobileLane] = useState(0);
@@ -148,14 +168,14 @@ export function Workspace({
   const closeInspector = useCallback(() => setInspection(null), []);
   const load = useCallback(async () => {
     const [s, c, f] = await Promise.all([
-      api<{ items: Source[] }>(`/projects/${project}/sources`),
-      api<{ items: Corpus[] }>(`/projects/${project}/corpus-versions`),
-      api<{ items: Configuration[] }>(`/projects/${project}/configurations`),
+      apiAll<Source>(`/projects/${project}/sources`),
+      apiAll<Corpus>(`/projects/${project}/corpus-versions`),
+      apiAll<Configuration>(`/projects/${project}/configurations`),
     ]);
     setSources(s.items);
     setCorpora(c.items);
     setConfigs(f.items);
-    setCorpusId((prior) => prior || c.items[0]?.id || "");
+    setCorpusId((prior) => c.items.some((c) => c.id === prior) ? prior : c.items[0]?.id || "");
   }, [project]);
   useEffect(() => {
     load().catch((e) => setError(e.message));
@@ -187,7 +207,7 @@ export function Workspace({
     const pending = Object.values(bundles).filter((b) =>
       ["queued", "preparing"].includes(b.status),
     );
-    if (!sources.some((s) => s.status === "processing") && !pending.length)
+    if (!sources.some((s) => s.status === "processing" || s.status === "deleting" && !s.error) && !pending.length)
       return;
     const timer = setTimeout(() => {
       Promise.all([
@@ -203,19 +223,20 @@ export function Workspace({
   useEffect(() => {
     if (view !== "history") return;
     const timer = setTimeout(() => {
-      api<{ items: Run[] }>(
-        `/projects/${project}/runs?q=${encodeURIComponent(historyQuery)}`,
+      api<{ items: Run[]; next_cursor: string | null }>(
+        `/projects/${project}/runs?q=${encodeURIComponent(historyQuery)}${historyStatus ? `&status=${historyStatus}` : ""}`,
       )
-        .then((r) => setHistory(r.items))
+        .then((r) => { setHistory(r.items); setHistoryCursor(r.next_cursor); })
         .catch((e) => setError(e.message));
     }, 200);
     return () => clearTimeout(timer);
-  }, [view, project, historyQuery]);
+  }, [view, project, historyQuery, historyStatus]);
   useEffect(() => {
     if (!run) return;
     const controller = new AbortController();
     let state = emptyState(run.id);
     let attempts = 0;
+    setDisconnected(false);
     savedEvents.current = [];
     setEvents([]);
     setPlayback(state);
@@ -265,6 +286,7 @@ export function Workspace({
           setConnected(false);
           if (++attempts >= 5) {
             setError((e as Error).message);
+            setDisconnected(true);
             return;
           }
         }
@@ -278,7 +300,7 @@ export function Workspace({
       controller.abort();
       setConnected(false);
     };
-  }, [run?.id]);
+  }, [run?.id, connectionAttempt]);
   async function action(work: () => Promise<void>) {
     setBusy(true);
     setError("");
@@ -458,6 +480,7 @@ export function Workspace({
                     <FileText size={22} />
                     <button
                       className="source-name"
+                      disabled={source.status !== "ready"}
                       onClick={() => setInspection({ kind: "source", source })}
                     >
                       <strong>{source.display_name}</strong>
@@ -472,6 +495,8 @@ export function Workspace({
                       )}
                     </button>
                     <Status value={source.status} />
+                    {source.status !== "deleted" && <Button tone="danger" aria-label={`Delete ${source.display_name}`} onClick={() => setInspection({ kind: "delete", source })}>{source.status === "deleting" ? "Retry cleanup" : "Delete"}</Button>}
+                    {source.status === "processing" && source.job_id && <Button tone="danger" onClick={() => action(async () => { await post(`/jobs/${source.job_id}/cancel`, undefined); await load(); })}>Cancel</Button>}
                     {source.kind === "postgres" &&
                       source.status === "ready" && (
                         <Button
@@ -517,6 +542,7 @@ export function Workspace({
                   Saved answers, evidence and recorded execution.
                 </p>
               </div>
+              <label className="caption">Status<select value={historyStatus} onChange={(e) => setHistoryStatus(e.target.value)}><option value="">All statuses</option>{["completed", "partial", "failed", "cancelled", "queued", "running"].map((status) => <option value={status} key={status}>{status}</option>)}</select></label>
               <input
                 aria-label="Search question history"
                 placeholder="Search questions…"
@@ -542,18 +568,24 @@ export function Workspace({
                       <strong>{item.question}</strong>
                       <span className="caption">
                         {new Date(item.created_at).toLocaleString()} ·{" "}
-                        {item.lanes.length} lanes
+                        {item.lanes.length} lanes · {item.mode === "live" ? "Live" : "Fixture"}
                       </span>
                     </div>
                     <Status value={item.status} />
                     <ChevronRight size={18} />
                   </button>
                 ))}
+                {historyCursor && <Button onClick={() => action(async () => {
+                  const page = await api<{items: Run[]; next_cursor: string | null}>(`/projects/${project}/runs?q=${encodeURIComponent(historyQuery)}${historyStatus ? `&status=${historyStatus}` : ""}&cursor=${encodeURIComponent(historyCursor)}`);
+                  setHistory((prior) => [...prior, ...page.items]); setHistoryCursor(page.next_cursor);
+                })}>Load more comparisons</Button>}
               </div>
             )}
           </>
         ) : (
           <>
+            <details className="comparison-setup" open={setupOpen} onToggle={(e) => setSetupOpen(e.currentTarget.open)}>
+              <summary>Sources and pipelines <span className="caption">{corpus ? `Corpus ${corpus.ordinal}` : "Choose sources"} · {selectedConfigs.length} selected · {ready ? "Ready" : "Preparation required"}</span></summary>
             <section className="setup-bar">
               <div>
                 <label className="caption">
@@ -606,6 +638,7 @@ export function Workspace({
                   Different routes to the same evidence
                 </span>
               </summary>
+              {configs.length > 0 && <label>Use a saved configuration<select value="" disabled={active || selected.length >= 6} onChange={(e) => { if (e.target.value) setSelected((prior) => [...prior, e.target.value]); }}><option value="">Choose a saved revision…</option>{configs.map((c) => <option key={c.id} value={c.id} disabled={selected.includes(c.id)}>{c.name} · revision {c.revision}</option>)}</select></label>}
               <div className="technique-grid">
                 {capabilities.map((c) => (
                   <button
@@ -670,6 +703,7 @@ export function Workspace({
                 ))}
               </div>
             )}
+            </details>
             <form className="question-box" onSubmit={ask}>
               <label className="sr-only" htmlFor="question">
                 Question for all selected lanes
@@ -707,6 +741,7 @@ export function Workspace({
               </Empty>
             ) : (
               <>
+                {run.mode !== "live" && <p className="fixture-run caption">Saved fixture run · synthetic model responses</p>}
                 <div className="comparison-heading">
                   <div>
                     <h2>{run.question}</h2>
@@ -717,11 +752,12 @@ export function Workspace({
                           ? "Receiving saved events"
                           : terminal(playback?.status || "")
                             ? "Saved comparison"
-                            : "Reconnecting…"}{" "}
+                            : disconnected ? "Connection interrupted" : "Reconnecting…"}{" "}
                       · Queue {ms(run.queue_ms)} · Timings describe this run
                     </span>
                   </div>
                   <Status value={playback?.status || run.status} />
+                  {disconnected && <Button onClick={() => { setError(""); setConnectionAttempt((n) => n + 1); }}>Reconnect to saved events</Button>}
                   {active && (
                     <Button
                       tone="danger"
@@ -930,36 +966,16 @@ export function Workspace({
                         </div>
                         {(tabs[lane.id] || "answer") === "answer" && (
                           <>
-                            <div className="answer-text">
+                            <div className="answer-text" onClick={(event) => {
+                              const label = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-citation]")?.dataset.citation;
+                              const evidence = state?.evidence.find((item) => item.label === label);
+                              if (evidence) setInspection({ kind: "evidence", evidence });
+                            }}>
                               {state?.answer ? (
                                 <ReactMarkdown
                                   remarkPlugins={[remarkGfm]}
-                                  components={{
-                                    img: () => null,
-                                    a: ({ href, children }) =>
-                                      href?.startsWith("#evidence-") &&
-                                      state.evidence.some(
-                                        (e) => e.label === href.slice(10),
-                                      ) ? (
-                                        <button
-                                          className="citation"
-                                          onClick={() => {
-                                            const e = state.evidence.find(
-                                              (e) => e.label === href.slice(10),
-                                            );
-                                            if (e)
-                                              setInspection({
-                                                kind: "evidence",
-                                                evidence: e,
-                                              });
-                                          }}
-                                        >
-                                          {children}
-                                        </button>
-                                      ) : (
-                                        <span>{children}</span>
-                                      ),
-                                  }}
+                                  components={answerComponents}
+                                  urlTransform={(href) => href.startsWith("#evidence-") && state.evidence.some((e) => e.label === href.slice(10)) ? href : ""}
                                 >
                                   {state.answer.replace(
                                     /\[(E[1-9][0-9]*)\]/g,
@@ -1070,8 +1086,9 @@ export function Workspace({
                             </details>
                           </div>
                         )}
+                        {terminal(lane.status) && <LaneFeedback key={lane.id} runId={run.id} lane={lane} />}
                         {!!state?.warnings.length && (
-                          <details className="lane-details">
+                          <details className="lane-details" open>
                             <summary>
                               {state.warnings.length} notice
                               {state.warnings.length > 1 ? "s" : ""}
@@ -1092,6 +1109,7 @@ export function Workspace({
                     );
                   })}
                 </div>
+                {terminal(run.status) && <RunPreference key={run.id} run={run} />}
               </>
             )}
           </>
@@ -1100,7 +1118,7 @@ export function Workspace({
       {inspection && (
         <Inspector
           title={
-            inspection.kind === "export" ? "Export implementation" : inspection.kind === "postgres"
+            inspection.kind === "delete" ? "Delete source" : inspection.kind === "export" ? "Export implementation" : inspection.kind === "postgres"
               ? "PostgreSQL snapshot"
               : inspection.kind === "step"
                 ? "Execution step"
@@ -1112,7 +1130,7 @@ export function Workspace({
           }
           onClose={closeInspector}
         >
-          {inspection.kind === "export" ? <ExportPanel key={inspection.lane.id} runId={inspection.runId} lane={inspection.lane} /> : inspection.kind === "postgres" ? (
+          {inspection.kind === "delete" ? <DeleteSource source={inspection.source} onDeleted={async () => { setSelectedSources((ids) => ids.filter((id) => id !== inspection.source.id)); setRun(null); setSetupOpen(true); await load(); closeInspector(); }} /> : inspection.kind === "export" ? <ExportPanel key={inspection.lane.id} runId={inspection.runId} lane={inspection.lane} fixture={run?.mode !== "live"} /> : inspection.kind === "postgres" ? (
             <PostgresSource
               project={project}
               initial={inspection.source}
@@ -1143,7 +1161,7 @@ export function Workspace({
             <ConfigurationForm
               config={inspection.config}
               busy={busy}
-              save={(config) =>
+              save={(config, alignGeneration) =>
                 action(async () => {
                   const saved = await post<Configuration>(
                     `/projects/${project}/configurations`,
@@ -1153,10 +1171,22 @@ export function Workspace({
                       based_on_config_id: inspection.config.id,
                     },
                   );
-                  setConfigs((prior) => [...prior, saved]);
+                  const aligned: Configuration[] = [];
+                  const originals = selectedConfigs.filter((c) => c.id !== inspection.config.id);
+                  if (alignGeneration) {
+                    for (const other of originals) {
+                      aligned.push(await post<Configuration>(`/projects/${project}/configurations`, {
+                        name: other.name, based_on_config_id: other.id,
+                        config: { ...other.config, generation: config.generation },
+                      }));
+                    }
+                  }
+                  setConfigs((prior) => [...prior, saved, ...aligned]);
+                  const replacements = new Map(aligned.map((c, i) => [originals[i].id, c.id]));
+                  setSetupOpen(true);
                   setSelected((prior) =>
                     prior.map((id) =>
-                      id === inspection.config.id ? saved.id : id,
+                      id === inspection.config.id ? saved.id : replacements.get(id) || id,
                     ),
                   );
                   setInspection({ kind: "settings", config: saved });
@@ -1188,21 +1218,23 @@ function SourceInspector({
 }: {
   inspection: Extract<Inspection, { kind: "source" | "evidence" }>;
 }) {
-  const [preview, setPreview] = useState(""),
+  const [preview, setPreview] = useState<components["schemas"]["SourcePreview"] | null>(null),
     [error, setError] = useState("");
   const evidence = inspection.kind === "evidence" ? inspection.evidence : null;
   const sourceId =
     evidence?.source_id ||
     (inspection.kind === "source" ? inspection.source.id : "");
   useEffect(() => {
-    setPreview("");
+    setPreview(null);
     setError("");
+    const controller = new AbortController();
     const query = evidence
       ? `?start_char=${evidence.location.char_start || 0}&max_chars=12000`
       : "";
-    api<{ content: string }>(`/sources/${sourceId}/content${query}`)
-      .then((p) => setPreview(p.content))
-      .catch((e) => setError(e.message));
+    api<components["schemas"]["SourcePreview"]>(`/sources/${sourceId}/content${query}`, { signal: controller.signal })
+      .then(setPreview)
+      .catch((e) => { if (!controller.signal.aborted) setError(e.message); });
+    return () => controller.abort();
   }, [sourceId, evidence]);
   return (
     <>
@@ -1262,9 +1294,11 @@ function SourceInspector({
         <ErrorNotice message={error} />
       ) : (
         <pre className="source-preview">
-          {preview || "Loading source text…"}
+          {preview?.content || "Loading source text…"}
         </pre>
       )}
+      {preview && <p className="caption">Preview of this source location · characters {preview.location.char_start}–{preview.location.char_end}.{preview.truncated ? " More text is available in the original source." : " Other pages or records, if any, are in the original source."}</p>}
+      <Button onClick={() => downloadFile(`/api/v1/sources/${sourceId}/file`, "source.txt").catch((e) => setError(e.message))}>Download original source</Button>
       <p className="caption">
         Citation labels can be checked syntactically. You decide whether the
         source supports the answer.
@@ -1280,9 +1314,22 @@ function ConfigurationForm({
 }: {
   config: Configuration;
   busy: boolean;
-  save: (config: Pipeline) => void;
+  save: (config: Pipeline, align: boolean) => void;
 }) {
   const [draft, setDraft] = useState<Pipeline>(structuredClone(config.config));
+  const [profiles, setProfiles] = useState<components["schemas"]["Profile"][]>([]);
+  const [profileError, setProfileError] = useState("");
+  const [align, setAlign] = useState(false);
+  useEffect(() => { api<{ items: components["schemas"]["Profile"][] }>("/system/profiles").then((p) => setProfiles(p.items)).catch((e) => setProfileError(e.message)); }, []);
+  const valueAt = (path: string[]) => path.reduce((value, key) => (value as Record<string, unknown>)[key], draft as unknown);
+  const update = (path: string[], value: unknown) => setDraft((prior) => {
+    const next = structuredClone(prior);
+    const parent = path.slice(0, -1).reduce((obj, key) => (obj as Record<string, unknown>)[key], next as unknown) as Record<string, unknown>;
+    parent[path.at(-1)!] = value; return next;
+  });
+  const field = (path: string[], label: string, min: number, max: number, step = 1, nullable = false) => <label>{label}<input type="number" min={min} max={max} step={step} required={!nullable} value={valueAt(path) == null ? "" : Number(valueAt(path))} onChange={(e) => update(path, nullable && e.target.value === "" ? null : Number(e.target.value))} /></label>;
+  const profileSelect = (operation: "generation" | "embedding" | "tree_indexing" | "tree_selection", selected: string, change: (p: components["schemas"]["Profile"]) => void) => <label>{operation.replaceAll("_", " ")} model<select value={selected} onChange={(e) => { const p = profiles.find((p) => p.id === e.target.value); if (p) change(p); }}>{profiles.filter((p) => p.operations.includes(operation)).map((p) => <option value={p.id} key={p.id} disabled={!p.available}>{p.label} · {p.models.join(", ")}{p.available ? "" : " · unavailable"}</option>)}</select></label>;
+
   useEffect(() => setDraft(structuredClone(config.config)), [config.id]);
   const number = (
     section: "search" | "generation",
@@ -1311,7 +1358,7 @@ function ConfigurationForm({
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        save(draft);
+        save(draft, align);
       }}
     >
       <h3>{config.name}</h3>
@@ -1319,6 +1366,8 @@ function ConfigurationForm({
         Saving creates a new revision. Prepare it before running. Generation
         settings must match across compared lanes.
       </p>
+      {profileError && <ErrorNotice message={profileError} />}
+      {profileSelect("generation", draft.generation.profile_id, (p) => setDraft({ ...draft, generation: { ...draft.generation, profile_id: p.id, model: p.models[0], max_output_tokens: Math.min(draft.generation.max_output_tokens, p.max_output_tokens || 512), seed: null, temperature: 0 } }))}
       {number("search", "candidate_k", "Candidate passages", 1, 100)}
       {number("search", "context_k", "Context passages", 1, 20)}
       {number(
@@ -1412,10 +1461,34 @@ function ConfigurationForm({
           </label>
         </>
       )}
+      <details><summary>Advanced retrieval settings</summary>
+        {draft.search.bm25 && <>{field(["search","bm25","k1"], "BM25 term saturation (k1)", .1, 3, .1)}{field(["search","bm25","b"], "BM25 length normalization (b)", 0, 1, .05)}{field(["search","bm25","epsilon"], "BM25 epsilon", 0, 1, .05)}</>}
+        {draft.embedding && <>
+          {profileSelect("embedding", draft.embedding.profile_id, (p) => setDraft({ ...draft, embedding: { ...draft.embedding!, profile_id: p.id, model: p.models[0], dimensions: p.dimensions! } }))}
+          <label>Document prefix<input value={draft.embedding.document_prefix} maxLength={200} onChange={(e) => update(["embedding","document_prefix"], e.target.value)} /></label>
+          <label>Query prefix<input value={draft.embedding.query_prefix} maxLength={200} onChange={(e) => update(["embedding","query_prefix"], e.target.value)} /></label>
+        </>}
+        {draft.search.dense && <>
+          <label>Vector search<select value={draft.search.dense.mode} onChange={(e) => update(["search","dense","mode"], e.target.value)}><option value="exact">Exact cosine search</option><option value="hnsw">HNSW approximate search</option></select></label>
+          {draft.search.dense.mode === "hnsw" && field(["search","dense","hnsw_ef"], "HNSW search effort", 8, 1024, 1, true)}
+          {field(["search","dense","min_score"], "Minimum cosine score (blank means no threshold)", -1, 1, .05, true)}
+        </>}
+        {draft.search.rrf && field(["search","rrf","k"], "Reciprocal rank fusion constant", 1, 1000)}
+        {draft.parent && field(["parent","max_parent_tokens"], "Maximum parent tokens", 256, 4096)}
+        {draft.reranker && <>{field(["reranker","max_input_tokens"], "Reranker scoring tokens", 64, 512)}<label>Reranker device<select value={draft.reranker.device} onChange={(e) => update(["reranker","device"], e.target.value)}><option value="cpu">CPU</option><option value="cuda">CUDA (requires available GPU)</option></select></label></>}
+        {draft.tree && <>
+          {profileSelect("tree_indexing", draft.tree.index_profile_id, (p) => setDraft({ ...draft, tree: { ...draft.tree!, index_profile_id: p.id, index_model: p.models[0] } }))}
+          {profileSelect("tree_selection", draft.tree.selection_profile_id, (p) => setDraft({ ...draft, tree: { ...draft.tree!, selection_profile_id: p.id, selection_model: p.models[0] } }))}
+          {field(["tree","max_documents"], "Maximum selected PDFs", 1, 3)}{field(["tree","max_depth"], "Tree depth limit", 1, 4)}{field(["tree","max_nodes"], "Tree node limit", 1, 12)}{field(["tree","max_calls"], "Tree model call limit", 1, 8)}{field(["tree","max_pages"], "Selected page limit", 1, 12)}
+        </>}
+        {field(["generation","seed"], "Answer seed (blank unless profile supports it)", 0, 2147483647, 1, true)}
+        {field(["limits","lane_timeout_ms"], "Lane deadline (milliseconds)", 1000, 300000, 1000)}
+      </details>
+      <label className="inline-check"><input type="checkbox" checked={align} onChange={(e) => setAlign(e.target.checked)} /> Apply these answer settings to all selected lanes</label>
       <details>
         <summary>Full effective configuration</summary>
         <pre className="source-preview">
-          {JSON.stringify(config.config, null, 2)}
+          {JSON.stringify(draft, null, 2)}
         </pre>
       </details>
       <Button type="submit" tone="primary" disabled={busy}>

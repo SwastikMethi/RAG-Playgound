@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { BookOpen, FlaskConical, History, LogOut, Plus } from "lucide-react";
+import { BookOpen, FlaskConical, History, LogOut, Plus, Settings2 } from "lucide-react";
 import {
   api,
+  apiAll,
   hasToken,
   post,
   setToken,
@@ -12,6 +13,7 @@ import {
 import { Button, Empty, ErrorNotice } from "./ui";
 import "./styles.css";
 import { Workspace } from "./Workspace";
+import { Setup } from "./Setup";
 
 function App() {
   const [signedIn, signIn] = useState(hasToken());
@@ -22,13 +24,13 @@ function App() {
   const [mode, setMode] = useState("live");
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [name, setName] = useState("");
-  const [view, setView] = useState<"playground" | "sources" | "history">(
+  const [view, setView] = useState<"playground" | "sources" | "history" | "setup">(
     "playground",
   );
   useEffect(() => {
     if (!signedIn) return;
     Promise.all([
-      api<{ items: Project[] }>("/projects"),
+      apiAll<Project>("/projects"),
       api<{ mode: string; items: Capability[] }>("/system/capabilities"),
     ])
       .then(([p, c]) => {
@@ -54,11 +56,13 @@ function App() {
   }
   async function addProject(e: React.FormEvent) {
     e.preventDefault();
+    const form = e.currentTarget as HTMLFormElement;
     try {
       const p = await post<Project>("/projects", { name });
       setProjects([...projects, p]);
       setProject(p.id);
       setName("");
+      form.closest("details")?.removeAttribute("open");
     } catch (e) {
       setError((e as Error).message);
     }
@@ -106,7 +110,7 @@ function App() {
           </span>
         </a>
         <label className="caption">
-          WORKSPACE
+          <span>WORKSPACE</span>
           <select
             value={project}
             onChange={(e) => setProject(e.target.value)}
@@ -142,6 +146,7 @@ function App() {
             <History size={18} />
             History
           </button>
+          <button className={view === "setup" ? "active" : ""} onClick={() => setView("setup")}><Settings2 size={18} />Setup</button>
         </nav>
         <details className="new-project">
           <summary>New project</summary>
@@ -174,10 +179,9 @@ function App() {
       <main className="workspace">
         <header className="page-heading">
           <div>
-            <div className="eyebrow">EXPLORE · COMPARE · UNDERSTAND</div>
-            <h1>Retrieval, made visible.</h1>
+            <h1>{view === "playground" ? "Compare retrieval" : view === "sources" ? "Your sources" : view === "setup" ? "Workspace setup" : "Saved comparisons"}</h1>
             <p className="muted">
-              Ask once. Inspect the evidence. Decide what works.
+              Ask a question. Inspect its sources. Choose what works.
             </p>
           </div>
           <span className="caption">Private workspace</span>
@@ -188,7 +192,7 @@ function App() {
           </div>
         )}
         {error && <ErrorNotice message={error} />}
-        {!project ? (
+        {view === "setup" ? <Setup /> : !project ? (
           <Empty title="Start with a project">
             <p>Keep a set of documents and comparisons together.</p>
             <form onSubmit={addProject} className="inline-form">

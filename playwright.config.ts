@@ -4,7 +4,7 @@ const environment = {
   RAG_APP_TOKEN: "fixture-browser-token-no-real-access",
   RAG_MODE: "fixture",
   RAG_DATABASE_URL:
-    "postgresql+psycopg://rag:local-development-only@127.0.0.1:6544/ragplayground_test",
+    "postgresql+psycopg://rag:local-development-only@127.0.0.1:6544/ragplayground_browser_test",
   RAG_ARTIFACT_ROOT: ".data/browser-artifacts",
   RAG_QDRANT_COLLECTION_PREFIX: "rag_browser_test",
 };
@@ -20,7 +20,7 @@ export default defineConfig({
   webServer: [
     {
       command:
-        ".venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8781",
+        ".venv/bin/python -m tests.browser_server",
       url: "http://127.0.0.1:8781/api/v1/health",
       env: environment,
       reuseExistingServer: false,

@@ -3,6 +3,7 @@
 import asyncio
 import json
 import time
+from datetime import timedelta
 from collections import OrderedDict
 
 from sqlalchemy import select
@@ -28,6 +29,7 @@ from app.runs import TERMINAL
 from rag_runtime.preparation import prepare_sources
 from rag_runtime.contracts import canonical, digest
 from rag_runtime.errors import Problem
+from rag_runtime.operational import log_event
 from rag_runtime.providers import Gateway, empty_usage, load_profiles
 from rag_runtime.registry import check_config, preparation_identity
 from rag_runtime.runtime import execute
@@ -46,6 +48,7 @@ class Worker:
         self.vectors = None
         self.cache = OrderedDict()
         self.cache_bytes = 0
+        self.last_vector_cleanup = 0
 
     def vector_store(self):
         if self.vectors is None:
@@ -102,6 +105,7 @@ class Worker:
                         "ingest_source": Source,
                         "prepare_index": IndexBundle,
                         "export_lane": Export,
+                        "delete_source": Source,
                     }.get(job.kind)
                     resource = (
                         s.scalar(
@@ -113,7 +117,55 @@ class Worker:
                         else None
                     )
                     if resource:
-                        resource.status, resource.error = "failed", error
+                        resource.status, resource.error = (
+                            ("deleting" if job.kind == "delete_source" else "failed"),
+                            error,
+                        )
+
+        await self.cleanup_orphan_vectors()
+
+    async def cleanup_orphan_vectors(self):
+        if time.monotonic() - self.last_vector_cleanup < 30:
+            return
+        self.last_vector_cleanup = time.monotonic()
+        with self.store.session() as s:
+            jobs = list(
+                s.scalars(
+                    select(Job)
+                    .where(
+                        Job.kind == "prepare_index",
+                        Job.status.in_(["failed", "cancelled"]),
+                        Job.completed_at < self.store.now(s) - timedelta(seconds=60),
+                        Job.progress["vector_scope"].as_json().is_not(None),
+                        Job.progress["vector_cleanup_done"].as_boolean().is_(None),
+                    )
+                    .limit(50)
+                )
+            )
+        for job in jobs:
+            if (
+                not job.progress.get("vector_scope")
+                or job.progress["vector_scope"]["project_id"] != job.project_id
+            ):
+                continue
+            with self.store.session() as s:
+                bundle = s.scalar(
+                    select(IndexBundle).where(
+                        IndexBundle.id == job.resource_id, IndexBundle.project_id == job.project_id
+                    )
+                )
+                if bundle and bundle.status == "ready":
+                    continue
+            try:
+                await self.vector_store().delete(
+                    Scope(**job.progress["vector_scope"]), job.progress["vector_dimensions"]
+                )
+            except Exception:
+                continue  # Keep the durable scope pending; maintenance retries when Qdrant returns.
+            with self.store.session() as s:
+                current = s.get(Job, job.id)
+                if current:
+                    current.progress = dict(current.progress, vector_cleanup_done=True)
 
     def fail_run(self, s, job, error):
         run = scoped(s, Run, job.resource_id, job.project_id, lock=True)
@@ -209,11 +261,14 @@ class Worker:
         claim = self.store.claim(job_id, compare_limit=self.settings.max_compare_runs)
         if not claim:
             return False
+        began = time.monotonic()
+        log_event("job.started", job_id=claim["id"], kind=claim["kind"], resource_id=claim["resource_id"])
         handler = {
             "ingest_source": self.ingest,
             "prepare_index": self.prepare,
             "compare_run": self.compare,
             "export_lane": self.export,
+            "delete_source": self.delete_source,
         }.get(claim["kind"])
         if handler is None:
             raise Problem("UNKNOWN_JOB", "This worker does not support the job type.")
@@ -249,6 +304,9 @@ class Worker:
                 job.completed_at, job.error = self.store.now(s), error.public() if error else None
                 if error and claim["kind"] == "compare_run":
                     self.fail_run(s, job, error.public())
+                if error and claim["kind"] == "delete_source":
+                    source = scoped(s, Source, claim["resource_id"], claim["project_id"])
+                    source.error = error.public()
                 if error and claim["kind"] in {"ingest_source", "prepare_index", "export_lane"}:
                     model = {"ingest_source": Source, "prepare_index": IndexBundle, "export_lane": Export}[
                         claim["kind"]
@@ -258,6 +316,14 @@ class Worker:
         except Problem as exc:
             if exc.code != "WORKER_LOST":
                 raise
+        log_event(
+            "job.finished",
+            job_id=claim["id"],
+            kind=claim["kind"],
+            resource_id=claim["resource_id"],
+            duration_ms=round((time.monotonic() - began) * 1000, 2),
+            error_code=error.code if error else None,
+        )
         return True
 
     async def ingest(self, claim):
@@ -341,12 +407,33 @@ class Worker:
                 },
             )
 
+    async def delete_source(self, claim):
+        from app.deletion import cleanup
+
+        await cleanup(self, claim)
+
     async def export(self, claim):
         from .export import export_lane
 
         await export_lane(self, claim)
 
     async def prepare(self, claim):
+        try:
+            await self._prepare(claim)
+        except BaseException:
+            with self.store.session() as s:
+                job = s.get(Job, claim["id"])
+                progress = job.progress if job and job.owner_token == claim["owner_token"] else {}
+            if progress.get("vector_scope"):
+                try:
+                    await self.vector_store().delete(
+                        Scope(**progress["vector_scope"]), progress["vector_dimensions"]
+                    )
+                except Exception:
+                    pass  # The durable scope remains for orphan reconciliation.
+            raise
+
+    async def _prepare(self, claim):
         began = time.monotonic()
         with self.store.session() as s:
             self.store.owned(s, claim["id"], claim["owner_token"])
