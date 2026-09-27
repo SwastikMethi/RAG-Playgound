@@ -2,8 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test("read-only PostgreSQL preview, snapshot, answer and credential removal", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("Application token").fill("fixture-browser-token-no-real-access");
-  await page.getByRole("button", { name: "Open workspace" }).click();
+  await expect(page.getByRole("heading", { name: "Compare retrieval" })).toBeVisible();
   await page.getByText("New project", { exact: true }).click();
   const name = "PostgreSQL browser " + Date.now();
   await page.getByLabel("New project name").fill(name);

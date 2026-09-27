@@ -63,7 +63,7 @@ Every test has observable pass conditions. Record failures and unperformed exter
 
 | ID | Scenario | Pass condition |
 | --- | --- | --- |
-| S01 | Access stream/file/export without token | Request denied and no protected bytes delivered |
+| S01 | Open workspace and access API/stream/file/export without token | Local access succeeds; cross-origin API requests are denied; no login or token setup required |
 | S02 | Unsafe Markdown/HTML in source or answer | Script and unsafe links cannot execute |
 | S03 | Prompt-injection fixture | No tools executed or credentials exposed; content stays evidence data |
 | S04 | Disallowed database host/schema | Connection/capture rejected with a safe error |

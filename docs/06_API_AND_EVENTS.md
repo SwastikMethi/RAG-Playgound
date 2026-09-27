@@ -4,7 +4,7 @@
 
 The machine-readable contract is contracts/openapi.yaml, with external JSON Schema references for pipeline configuration, trace events and export manifests. This document defines behavior that schema validation cannot express. Return JSON with UTF-8 encoding. Prefix all application endpoints with /api/v1.
 
-Every protected request carries Authorization: Bearer followed by the owner's application token. The health endpoint is public and contains no private details. Use same-origin requests. Never place the token, database credentials or model keys in URLs.
+The local application requires no application token or Authorization header, including streams and downloads. Bind the service to loopback and use same-origin requests; cross-origin API requests are denied. The health endpoint contains no private details. Never place database credentials or model keys in URLs.
 
 ## Resource flow
 
@@ -33,7 +33,7 @@ Every protected request carries Authorization: Bearer followed by the owner's ap
 | Read bundle | GET /index-bundles/{bundle_id} | Status, setup time, artifact reuse and warnings |
 | Submit comparison | POST /projects/{project_id}/runs | Freeze 1 to 6 lanes and enqueue; return 202 |
 | List or read runs | GET /projects/{project_id}/runs or /runs/{run_id} | Snapshot includes all lane IDs and latest event sequence |
-| Stream events | GET /runs/{run_id}/events | Authenticated SSE with after_seq cursor |
+| Stream events | GET /runs/{run_id}/events | Same-origin SSE with after_seq cursor |
 | Cancel run | POST /runs/{run_id}/cancel | Idempotent cancellation request |
 | Cancel lane | POST /runs/{run_id}/lanes/{lane_id}/cancel | Affect only the selected lane |
 | Read evidence | GET /runs/{run_id}/lanes/{lane_id}/evidence | Full protected evidence records and rank metadata |
@@ -115,6 +115,6 @@ Events carry bounded diagnostic excerpts and artifact references; the evidence e
 
 HTTP errors use an error object with code, message, retryable, details and request_id. Safe details identify invalid fields, unavailable dependencies or resource IDs, never provider authorization headers or full connection strings.
 
-Required codes include VALIDATION_ERROR, UNAUTHORIZED, NOT_FOUND, RESOURCE_BUSY, CONFIG_MISMATCH, INDEX_NOT_READY, CORPUS_UNSUPPORTED, ADAPTER_UNAVAILABLE, PROVIDER_UNAVAILABLE, RATE_LIMITED, PROVIDER_TIMEOUT, WORKER_LOST, INPUT_LIMIT, INVALID_CITATION, EXPORT_FAILED and INTERNAL_ERROR.
+Required codes include VALIDATION_ERROR, FORBIDDEN, NOT_FOUND, RESOURCE_BUSY, CONFIG_MISMATCH, INDEX_NOT_READY, CORPUS_UNSUPPORTED, ADAPTER_UNAVAILABLE, PROVIDER_UNAVAILABLE, RATE_LIMITED, PROVIDER_TIMEOUT, WORKER_LOST, INPUT_LIMIT, INVALID_CITATION, EXPORT_FAILED and INTERNAL_ERROR.
 
 Within an active stream, lane failures use structured events rather than replacing the SSE response with an HTTP error body. Failure before stream headers uses the ordinary HTTP error contract.

@@ -16,7 +16,7 @@ This maps [document 11](11_ACCEPTANCE_TESTS.md) to checks and inspected output. 
 | E03–E07 | Persisted SSE cursor in `test_api.py`; frontend Unicode/hash/deduplication/gap/replay tests; browser reconnection with no new run; live replay frames/speed/seek |
 | E08–E11 | `test_recovery.py`, `test_execution.py`, `test_foundations.py`: pre-start/partial cancellation, subprocess termination, deadlines, lease fencing, coordinator recovery; parallel failure isolation; live cancellation |
 | E12–E14 | API idempotency/conflict/no-evidence; `test_provider.py` pre-text retries/post-text failure; recorded wait/attempt metrics |
-| S01 | API auth contracts, protected streams/source/artifact/export downloads; standalone HTTP query 401 |
+| S01 | Token-free API contracts and browser journeys cover direct workspace access, streams and source/export downloads; cross-origin requests remain denied. The separately exported standalone HTTP query retains its own token. |
 | S02–S03 | Hostile HTML/script/image/JavaScript-link/instruction browser payload: no execution or external fetch; no tool-execution surface; secrets excluded from logs/portable config. This does not claim a model can never follow misleading source prose. |
 | S04–S07 | `test_postgres_source.py`: host/relation/column policy, quoted identifiers, read-only role, stable keys, repeatable-read, caps, frozen query after DB mutation and credential removal |
 | S08–S09 | `test_deletion.py`: busy guard, confirmation, retry, cascade, scoped vectors; API cross-project reference checks |

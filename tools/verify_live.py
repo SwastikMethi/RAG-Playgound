@@ -49,7 +49,6 @@ def main():
         (output / "live-report.json").write_text(json.dumps(report, indent=2))
 
     with TestClient(create_app(settings)) as client:
-        client.headers["Authorization"] = "Bearer " + settings.app_token.get_secret_value()
 
         def request(method, path, **kwargs):
             response = client.request(method, "/api/v1" + path, **kwargs)

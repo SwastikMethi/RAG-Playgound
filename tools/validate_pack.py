@@ -258,11 +258,10 @@ def main():
             ensure(path_vars == declared, f"Path parameter mismatch: {path}")
             ensure(all(p["required"] for p in op.get("parameters",[]) if p["in"] == "path"), "Optional path parameter")
             ensure(any(code.startswith("2") for code in op["responses"]), f"No success response: {path}")
-            if path != "/health":
-                ensure(op.get("security",api["security"]), f"Unprotected endpoint: {path}")
+            ensure(not op.get("security", api.get("security", [])), f"Unexpected application authentication: {path}")
     req = load(C/"examples/create-run.json")
     validate(req, api["components"]["schemas"]["CreateRun"], api_path)
-    checks.append("OpenAPI operations, parameters, authorization and references are internally consistent")
+    checks.append("OpenAPI operations, parameters, local access policy and references are internally consistent")
     manifest = load(ROOT/"fixtures/source-manifest.json")
     source_map = {}
     for source in manifest["sources"]:

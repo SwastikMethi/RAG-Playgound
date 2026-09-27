@@ -1,4 +1,3 @@
-import hmac
 import time
 from uuid import uuid4
 from contextlib import asynccontextmanager
@@ -45,13 +44,7 @@ def create_app(settings=None):
     async def boundary(request: Request, call_next):
         started, request_id = time.monotonic(), str(uuid4())
         path = request.url.path
-        token = app.state.settings.app_token.get_secret_value()
         if path.startswith("/api/") and path != "/api/v1/health":
-            value = request.headers.get("authorization", "")
-            if not hmac.compare_digest(value.encode(), f"Bearer {token}".encode()):
-                return JSONResponse(
-                    {"error": Problem("UNAUTHORIZED", "Enter the application token.", 401).public()}, 401
-                )
             origin = request.headers.get("origin")
             if origin and origin.rstrip("/") != str(request.base_url).rstrip("/"):
                 return JSONResponse(

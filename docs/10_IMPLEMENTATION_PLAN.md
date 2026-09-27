@@ -16,7 +16,7 @@ A missing model key can block a live check without blocking source handling, con
 - T006 Add deterministic provider interfaces and synthetic fixtures strictly for tests and labeled preview mode.
 - T007 Establish shared visual tokens, typography, spacing, controls and the workspace shell from document 13. Build reusable status, metric and inspector components before styling screens independently.
 
-Gate: Compose starts, migrations are repeatable, unauthorized private requests fail, contracts load, worker claims are exclusive, and the fake provider cannot activate silently in live mode.
+Gate: Compose starts on loopback without an application token, migrations are repeatable, cross-origin API requests fail, contracts load, worker claims are exclusive, and the fake provider cannot activate silently in live mode.
 
 ## M1 First real vertical slice
 
@@ -90,7 +90,7 @@ Gate: A clean temporary environment can run the exported package; deterministic 
 
 - T701 Finish feedback, preferred-lane notes, history filters and rerun navigation.
 - T702 Complete source deletion impact, busy-resource rejection and dependency cleanup across all stores.
-- T703 Verify Markdown/PDF rendering safety, auth on all protected resources and error redaction.
+- T703 Verify Markdown/PDF rendering safety, same-origin access across APIs/streams/downloads and error redaction.
 - T704 Add resource limits, health diagnostics, dependency-unavailable messages and cleanup of partial artifacts.
 - T705 Test keyboard navigation, reduced motion and useful mobile lane switching.
 - T706 Document setup, provider profiles, database roles, backup/rebuild, common errors and actual limits.

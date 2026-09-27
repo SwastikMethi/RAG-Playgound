@@ -4,11 +4,10 @@ info:
   title: RAG Playground API
   version: 1.0.0
   description: Single-owner playground API. This is an implementation contract, not
-    a running service. All private resources require bearer authorization.
+    a running service. Local access requires no application token; cross-origin requests are denied.
 servers:
 - url: /api/v1
-security:
-- ownerToken: []
+security: []
 paths:
   /health:
     get:
@@ -29,12 +28,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -95,12 +88,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -197,12 +184,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -264,12 +245,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -337,12 +312,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -429,12 +398,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -505,12 +468,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -570,12 +527,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -654,12 +605,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -724,7 +669,7 @@ paths:
   /sources/{source_id}/file:
     get:
       operationId: getSourceFile
-      summary: Read authorized original source bytes
+      summary: Read original source bytes
       responses:
         '403':
           description: Cross-origin request denied
@@ -740,12 +685,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -823,12 +762,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -889,12 +822,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -980,12 +907,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -1056,12 +977,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -1125,12 +1040,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -1187,12 +1096,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -1270,12 +1173,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -1346,12 +1243,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -1417,12 +1308,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -1509,12 +1394,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -1575,12 +1454,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -1666,12 +1539,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -1742,12 +1609,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -1808,12 +1669,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -1896,12 +1751,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -1962,12 +1811,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -2045,12 +1888,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -2155,12 +1992,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -2221,12 +2052,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -2314,12 +2139,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -2380,12 +2199,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -2458,12 +2271,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -2528,12 +2335,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -2612,12 +2413,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -2684,12 +2479,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -2776,12 +2565,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -2826,7 +2609,7 @@ paths:
   /exports/{export_id}/download:
     get:
       operationId: downloadExport
-      summary: Download authorized ready archive
+      summary: Download ready archive
       responses:
         '403':
           description: Cross-origin request denied
@@ -2842,12 +2625,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -2913,12 +2690,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -2998,12 +2769,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -3072,12 +2837,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -3139,12 +2898,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -3216,12 +2969,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -3282,12 +3029,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Malformed request or cursor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
           content:
             application/json:
               schema:
@@ -3370,12 +3111,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Resource not found
           content:
@@ -3413,11 +3148,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/TraceArtifact'
 components:
-  securitySchemes:
-    ownerToken:
-      type: http
-      scheme: bearer
-      description: Owner application token; never place in URLs.
   schemas:
     Error:
       type: object

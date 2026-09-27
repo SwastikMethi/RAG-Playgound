@@ -11,7 +11,7 @@ uv sync --frozen --all-extras
 uv run python tools/init_env.py
 ```
 
-Set `OPENAI_API_KEY` in the ignored `.env`. It already contains generated application and encryption keys. The default profiles use `https://api.openai.com/v1`, `gpt-4.1-mini-2025-04-14` and `text-embedding-3-small`. Keep secrets out of `.env.example`.
+Set `OPENAI_API_KEY` in the ignored `.env`. It already contains a generated encryption key for saved database credentials. The default profiles use `https://api.openai.com/v1`, `gpt-4.1-mini-2025-04-14` and `text-embedding-3-small`. Keep secrets out of `.env.example`.
 
 ```sh
 docker compose -f compose.yaml -f compose.dev.yaml up -d postgres qdrant
@@ -22,7 +22,7 @@ npm run build
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8780 --no-access-log
 ```
 
-In another terminal, run `uv run python -m workers.main`. Open **http://127.0.0.1:8780** and enter `RAG_APP_TOKEN` from your local `.env`. Create a project, upload sources, freeze a corpus, select techniques and prepare them before asking. `RAG_MODE=fixture` on **both** processes enables a visibly labeled synthetic demonstration.
+In another terminal, run `uv run python -m workers.main`. Open **http://127.0.0.1:8780**; the workspace opens directly without a login or application token. Create a project, upload sources, freeze a corpus, select techniques and prepare them before asking. `RAG_MODE=fixture` on **both** processes enables a visibly labeled synthetic demonstration.
 
 For the full container setup, PostgreSQL connection policy, backups, limits and troubleshooting, see [running the application](docs/17_RUNNING_THE_APPLICATION.md). See [implementation status](IMPLEMENTATION_STATUS.md) for checks actually performed and remaining limitations.
 

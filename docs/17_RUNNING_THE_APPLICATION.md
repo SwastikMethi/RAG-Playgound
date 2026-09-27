@@ -1,10 +1,10 @@
 # Running the application
 
-See [implementation status](../IMPLEMENTATION_STATUS.md) for actual verification coverage. This release is single-owner and binds to loopback. Use a trusted HTTPS reverse proxy and restrict network access before exposing it beyond your machine.
+See [implementation status](../IMPLEMENTATION_STATUS.md) for actual verification coverage. This release is single-owner and binds to loopback. The workspace opens without a login or application token. Before exposing it beyond your machine, add access control through a trusted HTTPS reverse proxy or restricted network.
 
 ## Local processes
 
-The [README](../README.md) has the startup commands. Use Python 3.12, Node 22+ and the committed `uv.lock` and `package-lock.json`. `tools/init_env.py` creates `.env` with private permissions and fresh application/encryption keys; it never overwrites existing settings. Set the provider API key locally. Never commit it or place it in example files.
+The [README](../README.md) has the startup commands. Use Python 3.12, Node 22+ and the committed `uv.lock` and `package-lock.json`. `tools/init_env.py` creates `.env` with private permissions and a fresh encryption key; it never overwrites existing settings. Set the provider API key locally. Never commit it or place it in example files.
 
 `docker compose -f compose.yaml -f compose.dev.yaml up -d postgres qdrant` exposes development storage at loopback ports 6544 and 6344. Apply `uv run alembic upgrade head` once before starting API and worker. Production builds are served by the API at port 8780. For frontend development, run `npm run dev` alongside the API (Vite proxies `/api` to port 8780). The worker must remain running for ingestion, preparation, comparison, deletion and export jobs.
 
@@ -26,7 +26,7 @@ The migration job completes before API/worker startup. API and worker share arti
 
 - `RAG_MODE=live` uses real configured providers. Missing keys, provider failures and unsupported settings fail explicitly. There is no fixture fallback. `RAG_MODE=fixture` on both API and worker enables synthetic answers and embeddings, visibly labeled in saved runs and exports.
 - `config/profiles.yaml` is owner-managed. Model identities, roles, dimensions, tokenizer and supported generation options must match the endpoint. `RAG_PROVIDER_HOST_ALLOWLIST` permits exact hosts. Requests validate DNS destinations, pin the resolved address and preserve TLS server-name verification. Redirects and metadata/link-local destinations are refused. To change credentials, update `.env` and restart API/worker; profile identity changes require compatible new preparation.
-- `/api/v1/health` is unauthenticated process liveness. The authenticated readiness endpoint checks database migration head and writable artifact storage. Setup shows profile and technique availability without billing model calls. A configured key does not prove provider access or quota. Qdrant failures are reported on affected vector operations.
+- `/api/v1/health` reports process liveness. The readiness endpoint checks database migration head and writable artifact storage. Neither requires a token. Setup shows profile and technique availability without billing model calls. A configured key does not prove provider access or quota. Qdrant failures are reported on affected vector operations.
 - A queued item usually means the worker is stopped or capacity is in use. Check `docker compose logs worker` or the worker terminal. Retry by starting a new preparation/run after correcting the cause. Worker loss fails unfinished work explicitly after its lease expires; it never silently repeats billable model calls.
 - If reranking is unavailable, install the `rerank` extra and prepare weights. If parsing fails because model assets are absent, prepare the PDF assets. Scanned or encrypted PDFs require a supported text-layer copy; the parser does not enable OCR.
 - Cancellation is best effort for upstream HTTP work and may incur provider charges. Owned parser, tree-indexing and reranker subprocesses are terminated. One lane can stop without stopping the others. Disconnecting a browser does not cancel work; reconnect/history uses persisted events.
@@ -37,7 +37,7 @@ Sources, corpus/configuration revisions, runs, traces and exports remain until e
 
 For a consistent backup, stop API and worker first, then capture all three stores: PostgreSQL (`pg_dump -Fc`), the artifact volume and Qdrant storage/snapshots. Keep the matching configuration, lockfile/runtime revision and `.env` separately in encrypted private storage. Copy stopped Docker volumes with your backup tooling; do not copy a running PostgreSQL data directory. Record the backup timestamp and restore all stores from the same checkpoint into a fresh stack, restore the external master key and run migration/readiness checks before restarting work. Test a source preview, old run replay and an export after restoring.
 
-The master key encrypts saved source-database credentials. Losing it makes those connections unreadable; frozen snapshots remain usable. Rotate safely by capturing any required sources, deleting stored connections while the old key is available, changing the key, restarting services and recreating connections. Changing the application token invalidates browser access until the new token is entered.
+The master key encrypts saved source-database credentials. Losing it makes those connections unreadable; frozen snapshots remain usable. Rotate safely by capturing any required sources, deleting stored connections while the old key is available, changing the key, restarting services and recreating connections.
 
 ## Supported limits and checks
 

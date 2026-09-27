@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { BookOpen, FlaskConical, History, LogOut, Plus, Settings2 } from "lucide-react";
+import { BookOpen, FlaskConical, History, Plus, Settings2 } from "lucide-react";
 import {
   api,
   apiAll,
-  hasToken,
   post,
-  setToken,
   type Capability,
   type Project,
 } from "./api";
@@ -16,8 +14,6 @@ import { Workspace } from "./Workspace";
 import { Setup } from "./Setup";
 
 function App() {
-  const [signedIn, signIn] = useState(hasToken());
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [projects, setProjects] = useState<Project[]>([]);
   const [project, setProject] = useState("");
@@ -28,7 +24,6 @@ function App() {
     "playground",
   );
   useEffect(() => {
-    if (!signedIn) return;
     let active = true;
     Promise.all([
       apiAll<Project>("/projects"),
@@ -44,19 +39,7 @@ function App() {
       })
       .catch((e) => { if (active) setError(e.message); });
     return () => { active = false; };
-  }, [signedIn]);
-  async function login(e: React.FormEvent) {
-    e.preventDefault();
-    setToken(password);
-    try {
-      await api("/system/profiles");
-      signIn(true);
-      setPassword("");
-    } catch (e) {
-      setToken("");
-      setError((e as Error).message);
-    }
-  }
+  }, []);
   async function addProject(e: React.FormEvent) {
     e.preventDefault();
     const form = e.currentTarget as HTMLFormElement;
@@ -70,37 +53,6 @@ function App() {
       setError((e as Error).message);
     }
   }
-  if (!signedIn)
-    return (
-      <main className="login">
-        <div className="brand">
-          <FlaskConical /> RAG Playground
-        </div>
-        <h1>
-          Your documents.
-          <br />
-          Different ways to find answers.
-        </h1>
-        <p className="muted">A private workspace for exploring retrieval.</p>
-        <form onSubmit={login}>
-          <label>
-            Application token
-            <input
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </label>
-          <Button tone="primary" type="submit">
-            Open workspace
-          </Button>
-        </form>
-        {error && <ErrorNotice message={error} />}
-        <p className="caption">The token stays in this browser session.</p>
-      </main>
-    );
   return (
     <div className="shell">
       <aside className="rail">
@@ -168,17 +120,6 @@ function App() {
             </Button>
           </form>
         </details>
-        <Button
-          onClick={() => {
-            setToken("");
-            signIn(false);
-            setProjects([]);
-            setProject("");
-          }}
-        >
-          <LogOut size={16} />
-          Lock workspace
-        </Button>
       </aside>
       <main className="workspace">
         <header className="page-heading">
@@ -188,7 +129,7 @@ function App() {
               Ask a question. Inspect its sources. Choose what works.
             </p>
           </div>
-          <span className="caption">Private workspace</span>
+          <span className="caption">Local workspace</span>
         </header>
         {mode !== "live" && (
           <div className="notice">

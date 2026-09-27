@@ -1,4 +1,3 @@
-import { headers } from "./api";
 import type { TraceEvent } from "./reducer";
 
 export async function streamEvents(
@@ -9,14 +8,10 @@ export async function streamEvents(
 ) {
   const response = await fetch(
     `/api/v1/runs/${runId}/events?after_seq=${after}`,
-    { headers: headers(), signal },
+    { signal },
   );
   if (!response.ok)
-    throw new Error(
-      response.status === 401
-        ? "The application token has expired. Lock and reopen the workspace."
-        : "The event stream is unavailable.",
-    );
+    throw new Error("The event stream is unavailable.");
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";

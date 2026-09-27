@@ -10,19 +10,6 @@ export type Bundle = components["schemas"]["IndexBundle"];
 export type Pipeline = Configuration["config"];
 export type Job = components["schemas"]["Job"];
 
-let token = sessionStorage.getItem("rag-token") || "";
-export function setToken(value: string) {
-  token = value;
-  value
-    ? sessionStorage.setItem("rag-token", value)
-    : sessionStorage.removeItem("rag-token");
-}
-export function hasToken() {
-  return !!token;
-}
-export function headers() {
-  return { Authorization: `Bearer ${token}` };
-}
 export async function api<T>(
   path: string,
   options: RequestInit = {},
@@ -30,7 +17,6 @@ export async function api<T>(
   const response = await fetch("/api/v1" + path, {
     ...options,
     headers: {
-      ...headers(),
       ...(options.body && !(options.body instanceof FormData)
         ? { "Content-Type": "application/json" }
         : {}),
@@ -66,7 +52,7 @@ export async function apiAll<T>(path: string): Promise<{ items: T[] }> {
 }
 
 export async function downloadFile(path: string, filename: string) {
-  const response = await fetch(path, { headers: headers() });
+  const response = await fetch(path);
   if (!response.ok) throw new Error("Download failed. Check that the file is still available.");
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");

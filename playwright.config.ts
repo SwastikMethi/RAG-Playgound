@@ -1,7 +1,6 @@
 import { defineConfig } from "@playwright/test";
 
 const environment = {
-  RAG_APP_TOKEN: "fixture-browser-token-no-real-access",
   RAG_MODE: "fixture",
   RAG_MASTER_KEY: "dGhpcy1pcy1hLWZpeHR1cmUta2V5LWZvci10ZXN0cyE=",
   RAG_DATABASE_URL:

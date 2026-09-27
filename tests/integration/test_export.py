@@ -11,7 +11,7 @@ from uuid import uuid4
 import pytest
 
 from rag_runtime.contracts import digest, validate
-from tests.integration.test_api import client as client, TOKEN
+from tests.integration.test_api import client as client
 
 pytestmark = pytest.mark.integration
 
@@ -72,8 +72,9 @@ def export_lane(client, worker, run, include_data=False):
     validate(item["manifest"], "export-manifest.schema.json")
     assert item["manifest"]["verification"]["offline_replay"]["status"] == "passed"
     assert item["manifest"]["verification"]["live_replay"]["status"] == "not_run"
-    assert client.get(item["download_url"], headers={"Authorization": ""}).status_code == 401
-    return item, client.get(item["download_url"]).content
+    response = client.get(item["download_url"])
+    assert response.status_code == 200
+    return item, response.content
 
 
 @pytest.mark.parametrize("technique", ["bm25", "dense", "hybrid", "hybrid_rerank", "parent_child"])
@@ -99,7 +100,6 @@ def test_all_chunk_adapter_exports_are_private_and_replay_the_shared_runtime(cli
             "confidential-original-name.md",
             run["question"],
             run["lanes"][0]["answer"],
-            TOKEN,
         ]:
             assert forbidden.encode() not in all_content
         assert (

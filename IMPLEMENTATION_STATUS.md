@@ -6,7 +6,15 @@ M0–M8 implementation, release checks and independent whole-branch review are c
 
 All six real adapters are implemented: BM25, scoped Qdrant dense retrieval, parallel hybrid RRF, hybrid with a pinned local cross-encoder, parent-child and experimental PageIndex. The application includes file ingestion, frozen PostgreSQL text snapshots, immutable corpus/configuration revisions, preparation reuse, independent streamed answers and citations, measured execution graphs, persisted replay, source inspection, manual feedback, history, reruns, confirmed retryable deletion and standalone export using the same runtime.
 
-Start with [README.md](README.md) or [operating instructions](docs/17_RUNNING_THE_APPLICATION.md). Local URL: `http://127.0.0.1:8780`; unlock using `RAG_APP_TOKEN` from your ignored `.env`. Run both the API and `python -m workers.main`. Configure `OPENAI_API_KEY` in `.env`, never in `.env.example`. Private credentials already supplied on this machine were kept out of Git.
+Start with [README.md](README.md) or [operating instructions](docs/17_RUNNING_THE_APPLICATION.md). Local URL: `http://127.0.0.1:8780`; the workspace opens directly without a login or application token. Run both the API and `python -m workers.main`. Configure `OPENAI_API_KEY` in `.env`, never in `.env.example`. Private credentials already supplied on this machine were kept out of Git.
+
+## Application token removal — 27 September 2026
+
+At the owner's request, removed the login/lock controls, browser token storage and request headers, API bearer checks, required token setting and token generation. Removed the obsolete setting from the local `.env` while preserving provider credentials and the encryption master key. Updated the access contract, generated client types, setup instructions and S01 acceptance gate. The playground remains bound to loopback with same-origin checks, CSP, scoped resource lookups and request limits. The separately exported standalone query service retains its own `RAG_QUERY_TOKEN`.
+
+The API and browser regressions first failed at the original token gate, then passed. Verification after removal: 50 Python tests passed (four dependency deprecation warnings, 108.49 s), five frontend tests, two browser journeys (33.1 s), production build, Ruff and pack validation. Browser journeys exercise upload/preparation, SSE/reconnect, source/export downloads and PostgreSQL capture without Authorization headers. Inspected desktop/mobile screenshots at 1440×900 and 390×844: `.data/release/no-token/bm25-desktop.png` and `bm25-mobile.png`. Restarted the local API; readiness returns `ok` without credentials. Backend log: `.data/release/no-token/pytest.log`.
+
+The initial release evidence below remains historical; no new billable OpenAI calls or Docker rebuild were needed for this access change.
 
 ## Checks actually run — 27 September 2026
 
@@ -44,7 +52,7 @@ Reviewed 1440×900, 1024×768 and 390×844 with all six live lanes, plus doubled
 
 All 35 observed steps expose purpose, input, action/result and measured duration. Parallel hybrid branches join visibly; rank changes link to the recorded passage; parent expansion links children to parents; PageIndex lists selected sections/pages. No private model reasoning or unobserved internals are fabricated. Replay frames 0/70/140 reconstruct the completed answers with original timings. Previous/next/seek, 4× speed, compressed waits and keyboard citation inspection passed with no browser errors.
 
-The final packing inspector also exposes the exact recorded token count/budget, excluded count and selected passages (`packing-desktop.png`). The app and worker are running locally; authenticated readiness and all six technique capabilities pass (`.data/release/readiness.json`).
+The final packing inspector also exposes the exact recorded token count/budget, excluded count and selected passages (`packing-desktop.png`). Initial release readiness and all six technique capabilities passed (`.data/release/readiness.json`).
 
 A final scan found no actual provider key, application token or encryption master key in tracked files or either live export ZIP. The local `.env` has mode 0600. Final test logs and the execution ledger are preserved in `.data/release`; the plan’s generated scratch workspace was cleaned up.
 
@@ -52,7 +60,7 @@ Inspected local screenshots under `.data/release/visuals`: `six-lanes-1440.png`,
 
 ## Boundaries and operator setup
 
-- OpenAI credentials and local model assets are verified on this machine. Elsewhere operators need provider credentials, a private app token and a stable encryption master key. PostgreSQL import needs approved host/relation/column policy and a read-only login. No external business database was requested or connected.
+- OpenAI credentials and local model assets are verified on this machine. Elsewhere operators need provider credentials and a stable encryption master key. PostgreSQL import needs approved host/relation/column policy and a read-only login. No external business database was requested or connected.
 - Offline replay controls external model boundaries and uses Qdrant local exact search. It verifies parity, not remote HNSW performance. No-data archives omit source bytes/names, questions, answers and credentials. Included-data exports include only selected frozen snapshots.
 - Linux ships CPU-only inference. GPU/CUDA, cloud deployment, load benchmarking, Safari/Firefox, screen-reader user testing and disaster recovery on an external production host were not performed. Zoom was tested through Chromium CSS zoom.
 - Cost remains unavailable without a matching price profile; usage is displayed without inventing zero charges. Dependency deprecations and the frontend chunk-size warning are non-fatal.

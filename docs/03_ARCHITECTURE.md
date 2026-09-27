@@ -15,7 +15,7 @@ The suggested stack is an implementation decision, not a requirement to replace 
 | Component | Responsibility |
 | --- | --- |
 | Frontend | Source management, configuration, independent lanes, stream reduction, evidence inspection and replay |
-| API | Authorization, validation, immutable snapshots, job creation, event streaming, artifact access and downloads |
+| API | Same-origin checks, validation, immutable snapshots, job creation, event streaming, artifact access and downloads |
 | Worker | Source ingestion, indexing, comparison orchestration, export and deletion cleanup |
 | Source adapters | Turn files or approved PostgreSQL records into immutable source artifacts |
 | Preparation planner | Resolve required indexes, deduplicate work and bind configurations to ready artifacts |
@@ -130,7 +130,7 @@ Share artifacts within one project only in v1. Reference-count shared artifacts 
 
 ## API and process isolation
 
-Serve frontend and API from one origin. Use explicit bearer authorization, strict allowed origins, and no credentials in query strings. Stream with fetch so the Authorization header and resume cursor are available. A file download uses authorized fetch and a Blob URL, then revokes it.
+Serve frontend and API from one origin, published on loopback. The local application requires no login or bearer token. Reject cross-origin requests and keep provider/database credentials out of query strings. Stream with fetch and a resume cursor. A file download uses same-origin fetch and a Blob URL, then revokes it.
 
 Parse untrusted files in bounded worker subprocesses. A worker task timeout must terminate its owned subprocess when safe; cancelling an asyncio wrapper alone does not stop synchronous parsing or reranking.
 

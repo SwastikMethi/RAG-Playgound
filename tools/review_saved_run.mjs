@@ -4,15 +4,13 @@ import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import assert from "node:assert/strict";
 
 const report = JSON.parse(readFileSync(".data/release/live-report.json", "utf8"));
-const token = readFileSync(".env", "utf8").split(/\r?\n/).find((line) => line.startsWith("RAG_APP_TOKEN="))?.slice(14);
-assert(token && report.status === "passed");
+assert(report.status === "passed");
 const output = ".data/release/visuals";
 mkdirSync(output, { recursive: true });
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
-await page.addInitScript((value) => sessionStorage.setItem("rag-token", value), token);
 try {
   await page.goto("http://127.0.0.1:8780");
   await page.getByLabel("Project", { exact: true }).selectOption(report.project_id);
@@ -83,12 +81,12 @@ try {
   await page.screenshot({ path: `${output}/pageindex-source-mobile.png` });
   await page.keyboard.press("Escape");
   assert(await citation.evaluate((element) => element === document.activeElement));
-  const projects = await (await page.request.get("http://127.0.0.1:8780/api/v1/projects?limit=100", { headers: { Authorization: `Bearer ${token}` } })).json();
+  const projects = await (await page.request.get("http://127.0.0.1:8780/api/v1/projects?limit=100")).json();
   const reviewedStates = [];
   await page.setViewportSize({ width: 1440, height: 900 });
   for (const status of ["cancelled", "failed"]) {
     for (const project of projects.items.filter((p) => p.name.startsWith("Live release check"))) {
-      const history = await (await page.request.get(`http://127.0.0.1:8780/api/v1/projects/${project.id}/runs?status=${status}`, { headers: { Authorization: `Bearer ${token}` } })).json();
+      const history = await (await page.request.get(`http://127.0.0.1:8780/api/v1/projects/${project.id}/runs?status=${status}`)).json();
       if (!history.items.length) continue;
       await page.getByLabel("Project", { exact: true }).selectOption(project.id);
       await page.getByRole("button", { name: "History", exact: true }).click();

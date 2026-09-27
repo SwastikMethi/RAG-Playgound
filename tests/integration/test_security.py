@@ -10,10 +10,10 @@ def test_readiness_and_operational_log_redaction(client, monkeypatch, capsys):
     response = client.get("/api/v1/system/readiness")
     assert response.json()["status"] == "ok"
     assert response.headers["x-request-id"]
-    client.get("/api/v1/projects?q=private-search-text")
+    client.get("/api/v1/projects?q=private-search-text", headers={"Authorization": "Bearer private-header"})
     log = capsys.readouterr().out
     assert '"event":"http"' in log and "private-search-text" not in log
-    assert client.app.state.settings.app_token.get_secret_value() not in log
+    assert "private-header" not in log
     monkeypatch.setattr(ScriptDirectory, "get_heads", lambda self: ["future-migration"])
     assert client.get("/api/v1/system/readiness").json()["status"] == "degraded"
 

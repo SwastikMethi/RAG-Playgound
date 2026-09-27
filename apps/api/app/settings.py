@@ -17,7 +17,6 @@ class DatabaseRelationPolicy(BaseModel):
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="RAG_", env_file=".env", extra="ignore")
-    app_token: SecretStr
     mode: Literal["live", "fixture", "test"] = "live"
     database_url: str = "postgresql+psycopg://rag:local-development-only@127.0.0.1:6544/ragplayground"
     qdrant_url: str = "http://127.0.0.1:6344"
@@ -42,10 +41,3 @@ class Settings(BaseSettings):
     @classmethod
     def relation_policy(cls, value):
         return [DatabaseRelationPolicy.model_validate(p).model_dump(by_alias=True) for p in value]
-
-    @field_validator("app_token")
-    @classmethod
-    def token_length(cls, value):
-        if len(value.get_secret_value()) < 24:
-            raise ValueError("Set RAG_APP_TOKEN to at least 24 random characters.")
-        return value

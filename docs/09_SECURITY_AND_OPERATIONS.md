@@ -4,9 +4,9 @@
 
 Release v1 is single-owner and self-hosted. Bind published ports to loopback by default. Do not market the initial release as a hardened multi-tenant service. A later hosted release needs accounts, object-level authorization, isolation, quotas, billing controls and retention guarantees.
 
-Protect all private APIs, streaming endpoints and downloads with the configured application token. The browser stores the token in session memory or sessionStorage for the active session, never in a URL. Use a strict Content Security Policy, sanitized Markdown and no third-party scripts handling private content. Clear token state on logout.
+The workspace, APIs, streaming endpoints and downloads require no application token. Access is controlled by the local deployment boundary: anyone able to reach the service can use it. Keep it on loopback; remote deployments need access control at the reverse proxy or network boundary. Use a strict Content Security Policy, sanitized Markdown and no third-party scripts handling private content.
 
-Run same-origin web/API in production. Do not enable wildcard CORS with credentials. Use constant-time token comparison and do not log authentication values.
+Run same-origin web/API and reject cross-origin API requests. Do not enable wildcard CORS with credentials or log authentication values supplied to upstream providers.
 
 ## Provider and connection secrets
 
@@ -48,7 +48,7 @@ Deletion must cover raw files, extracted text, chunks, vectors, trees, candidate
 
 ## Configuration and health
 
-Provide .env.example without secrets and a validated server configuration file. Required settings include application token, database DSN, artifact root, Qdrant URL, encryption key when connections are enabled, provider profiles, endpoint/host allowlists, concurrency caps and timeouts.
+Provide .env.example without secrets and a validated server configuration file. Required settings include database DSN, artifact root, Qdrant URL, encryption key when connections are enabled, provider profiles, endpoint/host allowlists, concurrency caps and timeouts.
 
 Separate liveness from readiness. Database and artifact storage failures prevent readiness. A missing optional technique dependency affects that technique's availability. Startup applies or checks migrations through one migration job, not competing API and worker auto-migrations.
 

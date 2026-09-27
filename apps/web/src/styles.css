@@ -468,20 +468,6 @@ form {
   color: #873c32;
   background: #fff4f2;
 }
-.login {
-  max-width: 520px;
-  margin: 10vh auto;
-  padding: 32px;
-}
-.login .brand {
-  margin-bottom: 56px;
-}
-.login h1 {
-  font-size: 36px;
-}
-.login form {
-  margin: 32px 0 20px;
-}
 .status {
   display: inline-flex;
   align-items: center;
@@ -604,12 +590,6 @@ form {
     width: min(100%, 420px);
     height: 100dvh;
     inset: 0 0 0 auto;
-  }
-  .login {
-    padding: 24px;
-  }
-  .login h1 {
-    font-size: 30px;
   }
 }
 .workspace-body {

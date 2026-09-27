@@ -2,11 +2,10 @@
 
 from pathlib import Path
 import os
-import secrets
 from cryptography.fernet import Fernet
 
 path = Path(".env")
-value = Path(".env.example").read_text().replace("RAG_APP_TOKEN=\n", f"RAG_APP_TOKEN={secrets.token_urlsafe(32)}\n")
+value = Path(".env.example").read_text()
 value = value.replace("RAG_MASTER_KEY=\n", f"RAG_MASTER_KEY={Fernet.generate_key().decode()}\n")
 try:
     with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as output:

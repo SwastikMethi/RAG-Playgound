@@ -8,12 +8,12 @@ test("upload, prepare, answer, inspect evidence and replay", async ({
   page.on("request", (request) => {
     if (new URL(request.url()).hostname !== "127.0.0.1") externalRequests.push(request.url());
     if (request.method() === "POST" && /\/projects\/[^/]+\/runs$/.test(request.url())) submittedRuns++;
+    if (request.url().includes("/api/v1/")) expect(request.headers().authorization).toBeUndefined();
   });
   await page.goto("/");
-  await page
-    .getByLabel("Application token")
-    .fill("fixture-browser-token-no-real-access");
-  await page.getByRole("button", { name: "Open workspace" }).click();
+  await expect(page.getByRole("heading", { name: "Compare retrieval" })).toBeVisible();
+  await expect(page.getByLabel("Application token")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Lock workspace" })).toHaveCount(0);
   await expect(
     page.getByText("Fixture demonstration · synthetic model responses"),
   ).toBeVisible();

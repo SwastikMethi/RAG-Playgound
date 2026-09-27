@@ -48,7 +48,6 @@ def test_profile_secrets_are_not_public_and_fixture_is_explicit(tmp_path, monkey
         "profiles:\n  - id: model\n    label: My model\n    model: chat\n    operations: [generation]\n    base_url: https://approved.example/v1\n    api_key_env: SOME_PRIVATE_KEY\n    max_input_tokens: 4096\n    max_output_tokens: 512\n"
     )
     settings = Settings(
-        app_token="x" * 32,
         profiles_path=profile_file,
         provider_host_allowlist=["approved.example"],
         _env_file=None,
@@ -57,5 +56,5 @@ def test_profile_secrets_are_not_public_and_fixture_is_explicit(tmp_path, monkey
     assert "secret-never-returned" not in str([p.public() for p in profiles.values()])
     assert all(p.kind != "fixture" for p in profiles.values())
     assert (
-        load_profiles(Settings(app_token="x" * 32, profiles_path=tmp_path / "missing", _env_file=None)) == {}
+        load_profiles(Settings(profiles_path=tmp_path / "missing", _env_file=None)) == {}
     )

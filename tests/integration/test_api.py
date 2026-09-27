@@ -11,7 +11,6 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 
 pytestmark = pytest.mark.integration
-TOKEN = "test-token-which-is-long-and-private"
 
 
 @pytest.fixture
@@ -19,14 +18,13 @@ def client(tmp_path):
     from app.main import create_app
 
     settings = Settings(
-        app_token=TOKEN,
         mode="test",
         database_url=TEST_URL,
         artifact_root=tmp_path,
         qdrant_collection_prefix="rag_test",
+        _env_file=None,
     )
     with TestClient(create_app(settings)) as c:
-        c.headers["Authorization"] = f"Bearer {TOKEN}"
         send = c.request
 
         def checked(method, url, *args, **kwargs):
@@ -53,12 +51,19 @@ def client(tmp_path):
         yield c
 
 
-def test_auth_contracts_and_immutable_configuration(client):
-    for path in ["/projects", "/system/profiles", "/runs/missing/events", "/sources/missing/file"]:
-        response = client.get("/api/v1" + path, headers={"Authorization": "Bearer wrong"})
-        assert response.status_code == 401
-        assert TOKEN not in response.text
-    assert client.get("/api/v1/health", headers={"Authorization": ""}).status_code == 200
+def test_token_free_contracts_and_immutable_configuration(client):
+    client.headers.pop("Authorization", None)
+    for path, status in [
+        ("/health", 200),
+        ("/projects", 200),
+        ("/system/profiles", 200),
+        ("/runs/missing/events", 404),
+        ("/sources/missing/file", 404),
+        ("/exports/missing/download", 404),
+    ]:
+        assert client.get("/api/v1" + path).status_code == status
+        if path != "/health":
+            assert client.get("/api/v1" + path, headers={"Origin": "https://other.example"}).status_code == 403
     capabilities = client.get("/api/v1/system/capabilities").json()
     assert capabilities["mode"] == "test" and len(capabilities["items"]) == 6
     assert all(validate(c, "openapi.yaml", "Capability") for c in capabilities["items"])
