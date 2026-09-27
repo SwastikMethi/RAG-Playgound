@@ -48,9 +48,11 @@ def check_vectors(vectors, dimensions):
 
 
 class VectorStore:
-    def __init__(self, url, prefix="rag_v1"):
+    def __init__(self, url, prefix="rag_v1", api_key=None):
         self.client = (
-            QdrantClient(location=":memory:") if url == ":memory:" else QdrantClient(url=url, timeout=20)
+            QdrantClient(location=":memory:")
+            if url == ":memory:"
+            else QdrantClient(url=url, api_key=api_key or None, timeout=20)
         )
         self.prefix = prefix
 

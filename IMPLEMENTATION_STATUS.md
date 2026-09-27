@@ -46,6 +46,18 @@ Hosted implementation rulings, in order:
 
 Deferred minor: local missing-key guidance points to Setup, although local mode reads `OPENAI_API_KEY` from `.env`. The README and operating guide contain the correct local instructions. This does not affect hosted key setup or credential isolation.
 
+## AWS low-idle deployment foundation — 27 September 2026
+
+The existing `codex/free-hosting` worktree is now linked to Neon project `holy-heart-36513512`, production branch. Neon configuration deploys the private `docs` object bucket, and the application uses its S3-compatible endpoint with path-style addressing and verified object hashes. Qdrant Cloud API keys are accepted only through the server settings boundary.
+
+AWS account `325657596214` in `us-east-1` has a $20 monthly budget with 50/80/100% alerts, public-subnet networking with no inbound worker ports, ECR, SQS/DLQ, a retained Secrets Manager container, CloudWatch logs and ECS roles. Stack `rag-playground` is `UPDATE_COMPLETE`; task definition `rag-playground-worker:1` references immutable ARM64 image tag `hosted-20260927-sleep` (digest `sha256:fc5a0ebc11e8ddb81190cd1d224063444307884be60064ced0449e0feeab3ea9`) with 2 vCPU, 8 GiB RAM, 40 GiB temporary storage, one slot, 60-second idle exit and a two-hour between-job cutoff. Verification showed zero running ECS tasks.
+
+The demo is live at `https://d4ru0nym2caah.cloudfront.net`. CloudFront serves the private S3 frontend and routes uncached `/api/*` requests to an IAM-only ARM64 Lambda Function URL. Direct origin access returns 403; CloudFront health returns JSON 200. The deployed API image is `hosted-20260927-wake` (`sha256:b02496af7c7512ca70edffadcd73feff4f0bc979d474405299acc1e047e95809`). Turnstile, Neon, Qdrant and server-only secrets are configured.
+
+Committed database jobs publish FIFO wakes after their transaction completes. The control Lambda starts an on-demand Fargate task and ignores duplicate wakes while a task is pending or running. A live smoke wake started task `7e562c02a87e4ec1aebd16741853c4e0` at 22:45:27 IST; with no queued work it stopped at 22:46:53 with exit code 0, leaving zero running tasks. Focused verification passed: 12 Python hosted/deployment tests, seven frontend tests, Ruff, production build, CloudFormation validation and live health/origin checks. Browser multipart requests now include the exact payload hash required by CloudFront OAC.
+
+Demo limit: uploads currently traverse Lambda, so use files below 5 MiB even though the local application supports 20 MiB. Each user must save an OpenAI key in Setup before billable preparation/comparison. Direct-to-object-storage uploads, backup automation and additional production hardening are intentionally outside this demo path.
+
 ## GPT-6 Luna provider compatibility — 27 September 2026
 
 Reproduced the reported provider failure: GPT-6 Luna rejected `max_tokens`, then rejected `temperature: 0` under its default reasoning setting. Model-access checks succeeded, and the existing run's retrieval/embedding/reranking stages had completed. Added typed server-profile options for the completion-token parameter and reasoning effort, used by both streamed answers and non-streaming PageIndex calls. The local answer profile now sends `max_completion_tokens` and `reasoning_effort: none`. Preserved the owner's model choices and embedding configuration. Default options retain legacy profile fingerprints, so existing prepared vector indexes remain valid. HTTP 400/422 provider errors now explain rejected request settings without exposing upstream bodies or credentials.

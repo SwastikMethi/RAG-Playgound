@@ -1,6 +1,7 @@
 """Hosted accounts and request credentials. Raw secrets never enter public schemas."""
 import hashlib
 import hmac
+import ipaddress
 import re
 import secrets
 from datetime import timedelta
@@ -98,6 +99,15 @@ def user_profiles(settings, profiles, user):
     return {id: p.with_key(key) for id, p in profiles.items()}
 
 
+def client_address(request, hosted=False):
+    value = request.headers.get("cloudfront-viewer-address", "") if hosted else ""
+    host = value[1:].split("]", 1)[0] if value.startswith("[") else value.rsplit(":", 1)[0]
+    try:
+        return str(ipaddress.ip_address(host))
+    except ValueError:
+        return request.client.host if not hosted and request.client else "unknown"
+
+
 def throttle(request, name, action):
     store = request.app.state.store
     # Serialize short counter updates across all API processes, including failures.
@@ -107,7 +117,7 @@ def throttle(request, name, action):
         now = store.now(s)
         s.execute(delete(AuthRate).where(AuthRate.expires_at <= now))
         s.execute(delete(AuthSession).where(AuthSession.expires_at <= now))
-        ip = request.client.host if request.client else "unknown"
+        ip = client_address(request, request.app.state.settings.deployment == "hosted")
         for identity, maximum in [("ip:" + ip, 30), ("user:" + name, 5)]:
             bucket = token_hash(action + ":" + identity)
             row = s.get(AuthRate, bucket)

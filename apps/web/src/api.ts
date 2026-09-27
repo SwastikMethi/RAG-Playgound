@@ -15,19 +15,32 @@ export function requireSession(response: Response) {
   if (response.status === 401 && !["/login", "/signup", "/recover"].includes(location.pathname)) location.replace("/login");
 }
 
+async function payloadHash(body: ArrayBuffer) {
+  const value = await crypto.subtle.digest("SHA-256", body);
+  return Array.from(new Uint8Array(value), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 export async function api<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
+  const method = options.method?.toUpperCase() || "GET";
+  const headers = new Headers(options.headers);
+  if (csrf && !["GET", "HEAD"].includes(method)) headers.set("X-CSRF-Token", csrf);
+  if (options.body && !(options.body instanceof FormData) && !headers.has("Content-Type"))
+    headers.set("Content-Type", "application/json");
+  let body = options.body;
+  if (body && ["POST", "PUT"].includes(method)) {
+    const serialized = new Request("https://local.invalid", { method, body, headers });
+    body = await serialized.arrayBuffer();
+    const contentType = serialized.headers.get("Content-Type");
+    if (contentType) headers.set("Content-Type", contentType);
+    headers.set("x-amz-content-sha256", await payloadHash(body));
+  }
   const response = await fetch("/api/v1" + path, {
     ...options,
-    headers: {
-      ...(csrf && options.method && !["GET", "HEAD"].includes(options.method) ? { "X-CSRF-Token": csrf } : {}),
-      ...(options.body && !(options.body instanceof FormData)
-        ? { "Content-Type": "application/json" }
-        : {}),
-      ...options.headers,
-    },
+    body,
+    headers: Object.fromEntries(headers),
   });
   if (!response.ok) {
     if (!path.startsWith("/auth/")) requireSession(response);

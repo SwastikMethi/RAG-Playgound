@@ -10,6 +10,8 @@ def exceeded(message):
 
 
 def disk_space(store, size=0):
+    if store.artifacts:
+        return
     if shutil.disk_usage(store.root).free - size < store.settings.min_free_bytes:
         raise Problem("STORAGE_FULL", "Storage is nearly full. Remove unused sources or try again later.", 503)
 

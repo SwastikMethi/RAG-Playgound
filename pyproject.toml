@@ -14,6 +14,7 @@ dependencies = [
   "python-multipart>=0.0.20,<1", "jsonschema>=4.23,<5", "PyYAML>=6,<7",
   "httpx>=0.28,<1", "rank-bm25==0.2.2", "qdrant-client==1.17.0",
   "tiktoken>=0.9,<1", "cryptography>=44", "pypdf>=5,<7",
+  "boto3>=1.35,<2",
 ]
 
 [project.optional-dependencies]

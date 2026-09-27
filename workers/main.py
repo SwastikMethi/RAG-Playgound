@@ -54,7 +54,11 @@ class Worker:
 
     def vector_store(self):
         if self.vectors is None:
-            self.vectors = VectorStore(self.settings.qdrant_url, self.settings.qdrant_collection_prefix)
+            self.vectors = VectorStore(
+                self.settings.qdrant_url,
+                self.settings.qdrant_collection_prefix,
+                self.settings.qdrant_api_key.get_secret_value(),
+            )
         return self.vectors
 
     def load_prepared(self, s, artifact_id, project_id):
@@ -685,6 +689,20 @@ class Worker:
             await asyncio.gather(watcher, return_exceptions=True)
 
 
+async def serve(worker):
+    started = idle_since = time.monotonic()
+    while True:
+        worked = await worker.run_once()
+        now = time.monotonic()
+        if worked:
+            idle_since = now
+        elif now - idle_since >= worker.settings.worker_idle_seconds:
+            return
+        if worker.settings.worker_max_seconds and now - started >= worker.settings.worker_max_seconds:
+            return
+        await asyncio.sleep(0.25)
+
+
 async def main():
     worker = Worker(Settings())
     print("Worker ready", flush=True)
@@ -695,7 +713,10 @@ async def main():
                 await asyncio.sleep(0.25)
 
     try:
-        await asyncio.gather(*(slot() for _ in range(worker.settings.worker_slots)))
+        if worker.settings.worker_idle_seconds:
+            await serve(worker)
+        else:
+            await asyncio.gather(*(slot() for _ in range(worker.settings.worker_slots)))
     finally:
         worker.close()
 

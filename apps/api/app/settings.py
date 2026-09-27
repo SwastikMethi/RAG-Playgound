@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     turnstile_site_key: str = ""
     turnstile_secret_key: SecretStr = SecretStr("")
     worker_slots: int = Field(5, ge=1, le=5)
+    worker_idle_seconds: int = Field(0, ge=0, le=600)
+    worker_max_seconds: int = Field(0, ge=0, le=7200)
     max_projects_per_user: int = Field(5, ge=1)
     max_upload_bytes_per_user: int = Field(500 * 1024**2, ge=1)
     max_artifact_bytes_per_user: int = Field(2 * 1024**3, ge=1)
@@ -32,7 +34,11 @@ class Settings(BaseSettings):
     min_free_bytes: int = Field(20 * 1024**3, ge=0)
     database_url: str = "postgresql+psycopg://rag:local-development-only@127.0.0.1:6544/ragplayground"
     qdrant_url: str = "http://127.0.0.1:6344"
+    qdrant_api_key: SecretStr = SecretStr("")
     artifact_root: Path = Path(".data/artifacts")
+    artifact_bucket: str | None = None
+    wake_queue_url: str = ""
+    aws_region: str = "us-east-1"
     profiles_path: Path = Path("config/profiles.yaml")
     master_key: SecretStr = SecretStr("")
     database_host_allowlist: list[str] = []

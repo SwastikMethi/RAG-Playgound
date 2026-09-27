@@ -1,0 +1,444 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: RAG Playground on-demand AWS compute foundation in us-east-1.
+
+Parameters:
+  ApiImageTag:
+    Type: String
+    Default: hosted-20260927-storagefix
+  WorkerImageTag:
+    Type: String
+    Default: hosted-20260927-sleep
+
+Resources:
+  ApiRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      EmptyOnDelete: false
+      ImageScanningConfiguration: {ScanOnPush: true}
+      ImageTagMutability: IMMUTABLE
+      LifecyclePolicy:
+        LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"Keep five images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":5},"action":{"type":"expire"}}]}'
+      RepositoryName: rag-playground-api
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption: {ServerSideEncryptionConfiguration: [{ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}}]}
+      PublicAccessBlockConfiguration: {BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true}
+      OwnershipControls: {Rules: [{ObjectOwnership: BucketOwnerEnforced}]}
+      VersioningConfiguration: {Status: Enabled}
+  FrontendOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${AWS::StackName}-frontend'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  ApiLogs:
+    Type: AWS::Logs::LogGroup
+    Properties: {RetentionInDays: 14}
+  ApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement: [{Effect: Allow, Principal: {Service: lambda.amazonaws.com}, Action: 'sts:AssumeRole'}]
+      Policies:
+        - PolicyName: RunApi
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub '${ApiLogs.Arn}:*'
+              - Effect: Allow
+                Action: 'secretsmanager:GetSecretValue'
+                Resource: !Ref DeploymentSecret
+              - Effect: Allow
+                Action: 'sqs:SendMessage'
+                Resource: !GetAtt WakeQueue.Arn
+  ApiFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: ApiLogs
+    Properties:
+      Architectures: [arm64]
+      Code: {ImageUri: !Sub '${ApiRepository.RepositoryUri}:${ApiImageTag}'}
+      Environment:
+        Variables:
+          RAG_ARTIFACT_BUCKET: docs
+          RAG_DEPLOYMENT: hosted
+          RAG_DEPLOYMENT_SECRET_ARN: !Ref DeploymentSecret
+          RAG_WAKE_QUEUE_URL: !Ref WakeQueue
+      LoggingConfig: {LogGroup: !Ref ApiLogs}
+      MemorySize: 1024
+      PackageType: Image
+      # ponytail: account concurrency quota is 10; reserve 10 after AWS raises the total to at least 20.
+      Role: !GetAtt ApiRole.Arn
+      Timeout: 90
+  ApiFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      AuthType: AWS_IAM
+      InvokeMode: RESPONSE_STREAM
+      TargetFunctionArn: !GetAtt ApiFunction.Arn
+  ApiOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${AWS::StackName}-api'
+        OriginAccessControlOriginType: lambda
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: RAG Playground
+        DefaultRootObject: index.html
+        Enabled: true
+        HttpVersion: http2and3
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: frontend
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt FrontendOriginAccessControl.Id
+            S3OriginConfig: {OriginAccessIdentity: ''}
+          - Id: api
+            DomainName: !Select [2, !Split ['/', !GetAtt ApiFunctionUrl.FunctionUrl]]
+            OriginAccessControlId: !GetAtt ApiOriginAccessControl.Id
+            CustomOriginConfig:
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
+        DefaultCacheBehavior:
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD, OPTIONS]
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          Compress: true
+          ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03
+          TargetOriginId: frontend
+          ViewerProtocolPolicy: redirect-to-https
+        CacheBehaviors:
+          - PathPattern: /api/*
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachedMethods: [GET, HEAD, OPTIONS]
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            Compress: true
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+            ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03
+            TargetOriginId: api
+            ViewerProtocolPolicy: redirect-to-https
+        CustomErrorResponses:
+          - {ErrorCode: 403, ResponseCode: 200, ResponsePagePath: /index.html, ErrorCachingMinTTL: 0}
+          - {ErrorCode: 404, ResponseCode: 200, ResponsePagePath: /index.html, ErrorCachingMinTTL: 0}
+  ApiUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunctionUrl'
+      FunctionName: !Ref ApiFunction
+      FunctionUrlAuthType: AWS_IAM
+      Principal: cloudfront.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Distribution}'
+  ApiInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref ApiFunction
+      Principal: cloudfront.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Distribution}'
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: cloudfront.amazonaws.com}
+            Action: 's3:GetObject'
+            Resource: !Sub '${FrontendBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Distribution}'
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.42.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags: [{Key: Name, Value: rag-playground}]
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: {InternetGatewayId: !Ref InternetGateway, VpcId: !Ref Vpc}
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: 10.42.0.0/24
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref Vpc
+      Tags: [{Key: Name, Value: rag-playground-public-a}]
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: 10.42.1.0/24
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref Vpc
+      Tags: [{Key: Name, Value: rag-playground-public-b}]
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: {VpcId: !Ref Vpc}
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties: {DestinationCidrBlock: 0.0.0.0/0, GatewayId: !Ref InternetGateway, RouteTableId: !Ref PublicRouteTable}
+  SubnetRouteA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {RouteTableId: !Ref PublicRouteTable, SubnetId: !Ref PublicSubnetA}
+  SubnetRouteB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {RouteTableId: !Ref PublicRouteTable, SubnetId: !Ref PublicSubnetB}
+  WorkerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Outbound-only RAG worker access
+      SecurityGroupEgress: [{IpProtocol: '-1', CidrIp: 0.0.0.0/0}]
+      VpcId: !Ref Vpc
+  WorkerRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      EmptyOnDelete: false
+      ImageScanningConfiguration: {ScanOnPush: true}
+      ImageTagMutability: IMMUTABLE
+      LifecyclePolicy:
+        LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"Keep five images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":5},"action":{"type":"expire"}}]}'
+      RepositoryName: rag-playground-worker
+  WakeDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      FifoQueue: true
+      MessageRetentionPeriod: 1209600
+      QueueName: !Sub '${AWS::StackName}-wake-dead.fifo'
+  WakeQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      FifoQueue: true
+      QueueName: !Sub '${AWS::StackName}-wake.fifo'
+      VisibilityTimeout: 300
+      RedrivePolicy: {deadLetterTargetArn: !GetAtt WakeDeadLetterQueue.Arn, maxReceiveCount: 5}
+  DeploymentSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: Server-only RAG deployment settings; populate before registering tasks.
+      SecretString: '{}'
+  WorkerLogs:
+    Type: AWS::Logs::LogGroup
+    Properties: {RetentionInDays: 14}
+  WorkerCluster:
+    Type: AWS::ECS::Cluster
+    Properties: {ClusterSettings: [{Name: containerInsights, Value: disabled}]}
+  WorkerExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement: [{Effect: Allow, Principal: {Service: ecs-tasks.amazonaws.com}, Action: 'sts:AssumeRole'}]
+      ManagedPolicyArns: [arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy]
+      Policies:
+        - PolicyName: ReadDeploymentSecret
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement: [{Effect: Allow, Action: 'secretsmanager:GetSecretValue', Resource: !Ref DeploymentSecret}]
+  WorkerTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement: [{Effect: Allow, Principal: {Service: ecs-tasks.amazonaws.com}, Action: 'sts:AssumeRole'}]
+  WorkerTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: rag-playground-worker
+      Cpu: '2048'
+      Memory: '8192'
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      RuntimePlatform: {CpuArchitecture: ARM64, OperatingSystemFamily: LINUX}
+      ExecutionRoleArn: !GetAtt WorkerExecutionRole.Arn
+      TaskRoleArn: !GetAtt WorkerTaskRole.Arn
+      EphemeralStorage: {SizeInGiB: 40}
+      ContainerDefinitions:
+        - Name: worker
+          Image: !Sub '${WorkerRepository.RepositoryUri}:${WorkerImageTag}'
+          Essential: true
+          Command: [python, -m, workers.main]
+          StopTimeout: 120
+          Environment:
+            - {Name: RAG_DEPLOYMENT, Value: hosted}
+            - {Name: RAG_WORKER_SLOTS, Value: '1'}
+            - {Name: RAG_WORKER_IDLE_SECONDS, Value: '60'}
+            - {Name: RAG_WORKER_MAX_SECONDS, Value: '7200'}
+            - {Name: RAG_MIN_FREE_BYTES, Value: '0'}
+            - {Name: RAG_ARTIFACT_BUCKET, Value: docs}
+          Secrets:
+            - {Name: RAG_DATABASE_URL, ValueFrom: !Sub '${DeploymentSecret}:RAG_DATABASE_URL::'}
+            - {Name: RAG_QDRANT_URL, ValueFrom: !Sub '${DeploymentSecret}:RAG_QDRANT_URL::'}
+            - {Name: RAG_QDRANT_API_KEY, ValueFrom: !Sub '${DeploymentSecret}:RAG_QDRANT_API_KEY::'}
+            - {Name: RAG_MASTER_KEY, ValueFrom: !Sub '${DeploymentSecret}:RAG_MASTER_KEY::'}
+            - {Name: RAG_PUBLIC_ORIGIN, ValueFrom: !Sub '${DeploymentSecret}:RAG_PUBLIC_ORIGIN::'}
+            - {Name: RAG_TURNSTILE_SITE_KEY, ValueFrom: !Sub '${DeploymentSecret}:RAG_TURNSTILE_SITE_KEY::'}
+            - {Name: RAG_TURNSTILE_SECRET_KEY, ValueFrom: !Sub '${DeploymentSecret}:RAG_TURNSTILE_SECRET_KEY::'}
+            - {Name: AWS_ACCESS_KEY_ID, ValueFrom: !Sub '${DeploymentSecret}:AWS_ACCESS_KEY_ID::'}
+            - {Name: AWS_SECRET_ACCESS_KEY, ValueFrom: !Sub '${DeploymentSecret}:AWS_SECRET_ACCESS_KEY::'}
+            - {Name: AWS_ENDPOINT_URL_S3, ValueFrom: !Sub '${DeploymentSecret}:AWS_ENDPOINT_URL_S3::'}
+            - {Name: RAG_AWS_REGION, ValueFrom: !Sub '${DeploymentSecret}:RAG_AWS_REGION::'}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options: {awslogs-group: !Ref WorkerLogs, awslogs-region: !Ref AWS::Region, awslogs-stream-prefix: worker}
+  ControlLogs:
+    Type: AWS::Logs::LogGroup
+    Properties: {RetentionInDays: 14}
+  ControlRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement: [{Effect: Allow, Principal: {Service: lambda.amazonaws.com}, Action: 'sts:AssumeRole'}]
+      Policies:
+        - PolicyName: WakeWorker
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub '${ControlLogs.Arn}:*'
+              - Effect: Allow
+                Action: [sqs:DeleteMessage, sqs:GetQueueAttributes, sqs:ReceiveMessage]
+                Resource: !GetAtt WakeQueue.Arn
+              - Effect: Allow
+                Action: [ecs:ListTasks, ecs:RunTask]
+                Resource: '*'
+              - Effect: Allow
+                Action: 'iam:PassRole'
+                Resource: [!GetAtt WorkerExecutionRole.Arn, !GetAtt WorkerTaskRole.Arn]
+  ControlFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: ControlLogs
+    Properties:
+      Architectures: [arm64]
+      Runtime: python3.12
+      Handler: index.handler
+      MemorySize: 128
+      Timeout: 30
+      Role: !GetAtt ControlRole.Arn
+      LoggingConfig: {LogGroup: !Ref ControlLogs}
+      Environment:
+        Variables:
+          CLUSTER: !Ref WorkerCluster
+          TASK_DEFINITION: !Ref WorkerTaskDefinition
+          SUBNETS: !Join [',', [!Ref PublicSubnetA, !Ref PublicSubnetB]]
+          SECURITY_GROUP: !Ref WorkerSecurityGroup
+      Code:
+        ZipFile: |
+          import os
+          import boto3
+
+          ecs = boto3.client("ecs")
+
+          def handler(event, _context):
+              if event.get("source") == "aws.ecs":
+                  exits = [item.get("exitCode", 0) for item in event.get("detail", {}).get("containers", [])]
+                  if exits and not any(code for code in exits):
+                      return {"started": False, "reason": "clean-stop"}
+              cluster = os.environ["CLUSTER"]
+              family = os.environ["TASK_DEFINITION"].split("/")[-1].split(":")[0]
+              active = []
+              for status in ("RUNNING", "PENDING"):
+                  active += ecs.list_tasks(cluster=cluster, family=family, desiredStatus=status)["taskArns"]
+              if active:
+                  return {"started": False, "task": active[0]}
+              record = (event.get("Records") or [{}])[0]
+              token = record.get("messageId") or event.get("id") or "scheduled-reconciliation"
+              result = ecs.run_task(
+                  cluster=cluster,
+                  taskDefinition=os.environ["TASK_DEFINITION"],
+                  launchType="FARGATE",
+                  platformVersion="LATEST",
+                  count=1,
+                  clientToken=token,
+                  startedBy=("rag-wake-" + token)[:36],
+                  networkConfiguration={"awsvpcConfiguration": {
+                      "subnets": os.environ["SUBNETS"].split(","),
+                      "securityGroups": [os.environ["SECURITY_GROUP"]],
+                      "assignPublicIp": "ENABLED",
+                  }},
+              )
+              if result.get("failures"):
+                  raise RuntimeError(str(result["failures"]))
+              return {"started": True, "task": result["tasks"][0]["taskArn"]}
+  WakeMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 10
+      Enabled: true
+      EventSourceArn: !GetAtt WakeQueue.Arn
+      FunctionName: !Ref ControlFunction
+  HourlyReconciliation:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: rate(1 hour)
+      State: ENABLED
+      Targets: [{Arn: !GetAtt ControlFunction.Arn, Id: control}]
+  HourlyReconciliationPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref ControlFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt HourlyReconciliation.Arn
+  WorkerCrashRule:
+    Type: AWS::Events::Rule
+    Properties:
+      EventPattern:
+        source: [aws.ecs]
+        detail-type: ['ECS Task State Change']
+        detail:
+          clusterArn: [!GetAtt WorkerCluster.Arn]
+          lastStatus: [STOPPED]
+      State: ENABLED
+      Targets: [{Arn: !GetAtt ControlFunction.Arn, Id: control}]
+  WorkerCrashPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref ControlFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WorkerCrashRule.Arn
+Outputs:
+  ApiFunctionUrl: {Value: !GetAtt ApiFunctionUrl.FunctionUrl}
+  ApiRepositoryUri: {Value: !GetAtt ApiRepository.RepositoryUri}
+  CloudFrontDistributionId: {Value: !Ref Distribution}
+  CloudFrontHostname: {Value: !GetAtt Distribution.DomainName}
+  DeploymentSecretArn: {Value: !Ref DeploymentSecret}
+  FrontendBucket: {Value: !Ref FrontendBucket}
+  PublicSubnetA: {Value: !Ref PublicSubnetA}
+  PublicSubnetB: {Value: !Ref PublicSubnetB}
+  WakeQueueArn: {Value: !GetAtt WakeQueue.Arn}
+  WakeQueueUrl: {Value: !Ref WakeQueue}
+  WorkerClusterArn: {Value: !GetAtt WorkerCluster.Arn}
+  WorkerExecutionRoleArn: {Value: !GetAtt WorkerExecutionRole.Arn}
+  WorkerRepositoryUri: {Value: !GetAtt WorkerRepository.RepositoryUri}
+  WorkerSecurityGroup: {Value: !Ref WorkerSecurityGroup}
+  WorkerTaskDefinitionArn: {Value: !Ref WorkerTaskDefinition}
+  WorkerTaskRoleArn: {Value: !GetAtt WorkerTaskRole.Arn}

@@ -223,7 +223,7 @@ async def cleanup(worker, claim):
                 select(Artifact).where(Artifact.id == artifact_id, Artifact.project_id == project)
             )
             if artifact:
-                store.path(artifact).unlink(missing_ok=True)
+                store.remove(artifact)
                 s.delete(artifact)
     with store.session() as s:
         store.owned(s, claim["id"], claim["owner_token"])

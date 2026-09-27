@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: RAG Playground monthly AWS budget guardrail.
+
+Parameters:
+  AlertEmail:
+    Type: String
+
+Resources:
+  MonthlyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: rag-playground-monthly
+        BudgetLimit: {Amount: 20, Unit: USD}
+        BudgetType: COST
+        TimeUnit: MONTHLY
+      NotificationsWithSubscribers:
+        - Notification: {ComparisonOperator: GREATER_THAN, NotificationType: ACTUAL, Threshold: 50, ThresholdType: PERCENTAGE}
+          Subscribers: [{Address: !Ref AlertEmail, SubscriptionType: EMAIL}]
+        - Notification: {ComparisonOperator: GREATER_THAN, NotificationType: ACTUAL, Threshold: 80, ThresholdType: PERCENTAGE}
+          Subscribers: [{Address: !Ref AlertEmail, SubscriptionType: EMAIL}]
+        - Notification: {ComparisonOperator: GREATER_THAN, NotificationType: ACTUAL, Threshold: 100, ThresholdType: PERCENTAGE}
+          Subscribers: [{Address: !Ref AlertEmail, SubscriptionType: EMAIL}]

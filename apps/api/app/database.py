@@ -1,4 +1,6 @@
 import os
+import json
+import logging
 from contextlib import contextmanager
 from copy import copy
 from datetime import timedelta
@@ -10,6 +12,31 @@ from sqlalchemy.orm import Session
 from rag_runtime.contracts import digest
 from rag_runtime.errors import Problem
 from .models import Artifact, AuthSession, Job, Project, uid
+from .artifacts import S3ArtifactBackend
+
+
+logger = logging.getLogger(__name__)
+
+
+def collect_wakes(session, _context):
+    ids = session.info.setdefault("wake_job_ids", set())
+    ids.update(row.id for row in session.new if isinstance(row, Job))
+
+
+def publish_wakes(settings, job_ids, client=None):
+    if not settings or not settings.wake_queue_url:
+        return
+    if client is None:
+        import boto3
+
+        client = boto3.client("sqs")
+    for job_id in sorted(job_ids):
+        client.send_message(
+            QueueUrl=settings.wake_queue_url,
+            MessageBody=json.dumps({"job_id": job_id}, separators=(",", ":")),
+            MessageGroupId="worker",
+            MessageDeduplicationId=job_id,
+        )
 
 
 def scoped(session, model, resource_id, project_id=None, lock=False):
@@ -35,6 +62,7 @@ class Store:
         self.root.mkdir(parents=True, exist_ok=True)
         self.lease_seconds = lease_seconds
         self.settings = settings
+        self.artifacts = S3ArtifactBackend(settings.artifact_bucket, settings.aws_region) if settings and settings.artifact_bucket else None
         self.owner_id = self.session_hash = None
 
     def for_user(self, owner_id, session_hash):
@@ -54,12 +82,17 @@ class Store:
                         from .quotas import admission
                         session.execute(text("SELECT pg_advisory_xact_lock(71234005)"))
                         event.listen(session, "before_flush", admission)
+                        event.listen(session, "after_flush", collect_wakes)
                     if self.owner_id is not None:
                         auth = session.get(AuthSession, self.session_hash)
                         if not auth or auth.user_id != self.owner_id or auth.expires_at <= self.now(session):
                             raise Problem("UNAUTHENTICATED", "Sign in to continue.", 401)
                         session.info["owner_id"] = self.owner_id
                     yield session
+                try:
+                    publish_wakes(self.settings, session.info.get("wake_job_ids", ()))
+                except Exception:
+                    logger.exception("Failed to publish committed job wake; reconciliation will recover it.")
             except BaseException:
                 for path in session.info.get("created_paths", []):
                     path.unlink(missing_ok=True)
@@ -120,6 +153,8 @@ class Store:
             return True
 
     def path(self, artifact):
+        if self.artifacts:
+            return self.artifacts.materialize(artifact.relative_storage_key)
         raw = self.root / artifact.relative_storage_key
         path = raw.resolve()
         if (
@@ -136,6 +171,16 @@ class Store:
             artifact_admission(self, session, project_id, kind, len(content))
         artifact_id = uid()
         relative = f"{project_id}/{artifact_id}"
+        if self.artifacts:
+            self.artifacts.put(relative, content)
+            artifact = Artifact(
+                id=artifact_id, project_id=project_id, kind=kind,
+                content_sha256=digest(content), relative_storage_key=relative,
+                byte_count=len(content), manifest=manifest or {},
+            )
+            session.add(artifact)
+            session.flush()
+            return artifact
         target = self.root / relative
         if not target.resolve().is_relative_to(self.root):
             raise Problem("INTERNAL_ERROR", "Invalid artifact scope.", 500)
@@ -162,7 +207,13 @@ class Store:
 
     def read(self, session, artifact_id, project_id):
         artifact = scoped(session, Artifact, artifact_id, project_id)
-        content = self.path(artifact).read_bytes()
+        content = self.artifacts.read(artifact.relative_storage_key) if self.artifacts else self.path(artifact).read_bytes()
         if digest(content) != artifact.content_sha256:
             raise Problem("INTERNAL_ERROR", "Stored artifact failed its integrity check.", 500)
         return content
+
+    def remove(self, artifact):
+        if self.artifacts:
+            self.artifacts.delete(artifact.relative_storage_key)
+        else:
+            self.path(artifact).unlink(missing_ok=True)

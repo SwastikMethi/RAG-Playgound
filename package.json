@@ -14,6 +14,8 @@
     "generate:types": "node tools/generate-types.mjs"
   },
   "dependencies": {
+    "@neon/config": "^1.8.2",
+    "@neon/env": "^1.4.7",
     "@xyflow/react": "12.12.0",
     "lucide-react": "1.48.0",
     "react": "19.3.0",
