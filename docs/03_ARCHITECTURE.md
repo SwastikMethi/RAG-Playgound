@@ -132,6 +132,15 @@ Share artifacts within one project only in v1. Reference-count shared artifacts 
 
 Serve frontend and API from one origin, published on loopback. The local application requires no login or bearer token. Reject cross-origin requests and keep provider/database credentials out of query strings. Stream with fetch and a resume cursor. A file download uses same-origin fetch and a Blob URL, then revokes it.
 
+Hosted mode retains the same API/runtime but adds a request-owned Store and profile
+view after cookie authentication. Every data lookup scopes through the owning
+project. A worker resolves the project owner again at claim time and injects that
+user's decrypted provider key into private profile attributes; live export
+verification passes it only to its child process environment. Keys never enter
+portable manifests or fingerprints. Hosted admission limits share a short
+PostgreSQL transaction lock. New Qdrant collections keep vectors and HNSW on disk
+for the small VM's memory budget. See documents 19–20 for deployment and recovery.
+
 Parse untrusted files in bounded worker subprocesses. A worker task timeout must terminate its owned subprocess when safe; cancelling an asyncio wrapper alone does not stop synchronous parsing or reranking.
 
 Model endpoints and database hosts are configured through owner-controlled profiles with validated allowlists. Raw source URLs, arbitrary filesystem paths and user-supplied executable plugins are excluded from v1.

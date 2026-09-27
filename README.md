@@ -2,6 +2,11 @@
 
 A private, self-hosted workspace for comparing six retrieval techniques against your documents and PostgreSQL text snapshots. Ask once, inspect independent streamed answers, replay measured execution steps, leave feedback and export a standalone implementation.
 
+For public hosting, use the [Oracle Always Free deployment guide](docs/20_HOSTED_DEPLOYMENT.md).
+Hosted mode adds signup/login, recovery codes, private user data and individual
+encrypted OpenAI keys. The deployment files are ready for an account/VM to be configured;
+no public deployment has been made. Passwords use Argon2id; Fernet encrypts API keys.
+
 ## Run locally
 
 Requires Python 3.12, uv, Node 22+ and Docker Compose. From this directory:

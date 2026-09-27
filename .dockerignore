@@ -6,6 +6,8 @@ node_modules
 .data
 .cache
 .superpowers
+.implementation
+.worktrees
 test-results
 playwright-report
 **/__pycache__

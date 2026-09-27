@@ -18,13 +18,21 @@ from workers.main import Worker
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--allow-model-calls", action="store_true")
+    parser.add_argument("--hosted-test-account", action="store_true",
+                        help="Seed one account in an isolated *_test database; does not verify Turnstile.")
     args = parser.parse_args()
     if not args.allow_model_calls:
         parser.error("Pass --allow-model-calls to use configured credentials for bounded, billable checks.")
     settings = Settings()
     if settings.mode != "live":
         parser.error("RAG_MODE must be live. Fixture responses cannot pass this check.")
-    output = Path(".data/release")
+    if settings.deployment == "hosted":
+        from sqlalchemy.engine import make_url
+        if not args.hosted_test_account or not make_url(settings.database_url).database.endswith("_test"):
+            parser.error("Hosted smoke requires --hosted-test-account and an isolated *_test database.")
+    elif args.hosted_test_account:
+        parser.error("Set RAG_DEPLOYMENT=hosted for the hosted smoke.")
+    output = Path(".data/release/hosted-live" if args.hosted_test_account else ".data/release")
     output.mkdir(parents=True, exist_ok=True)
     pdf = output / "fictional-clock-guide.pdf"
     canvas = Canvas(str(pdf))
@@ -48,7 +56,29 @@ def main():
     def save():
         (output / "live-report.json").write_text(json.dumps(report, indent=2))
 
-    with TestClient(create_app(settings)) as client:
+    with TestClient(create_app(settings), base_url=settings.public_origin or "http://testserver") as client:
+        if args.hosted_test_account:
+            import os
+            import secrets
+            from datetime import timedelta
+            from app.auth import COOKIE, csrf, hash_password, token_hash
+            from app.connections import cipher
+            from app.models import AuthSession, User
+            key = os.environ.get("OPENAI_API_KEY", "")
+            if not key:
+                parser.error("Provide OPENAI_API_KEY in the environment for the isolated test account.")
+            token = secrets.token_urlsafe(32)
+            with client.app.state.store.session() as s:
+                user = User(username="smoke-"+uuid4().hex[:16], password_hash=hash_password(secrets.token_urlsafe(24)),
+                            recovery_hash=token_hash(secrets.token_urlsafe(32)),
+                            encrypted_openai_key=cipher(settings).encrypt(key.encode()).decode())
+                s.add(user)
+                s.flush()
+                s.add(AuthSession(token_hash=token_hash(token), user_id=user.id,
+                                  expires_at=client.app.state.store.now(s)+timedelta(hours=1)))
+            client.cookies.set(COOKIE, token)
+            client.headers.update({"Origin": settings.public_origin, "X-CSRF-Token": csrf(settings, token)})
+            report["authentication"] = "Real hosted session; operator-seeded test account; Turnstile not exercised"
 
         def request(method, path, **kwargs):
             response = client.request(method, "/api/v1" + path, **kwargs)

@@ -1,6 +1,6 @@
 # Running the application
 
-See [implementation status](../IMPLEMENTATION_STATUS.md) for actual verification coverage. This release is single-owner and binds to loopback. The workspace opens without a login or application token. Before exposing it beyond your machine, add access control through a trusted HTTPS reverse proxy or restricted network.
+See [implementation status](../IMPLEMENTATION_STATUS.md) for actual verification coverage. The local mode described here is single-owner and binds to loopback, opening without a login or application token. For public deployment, use the separate [hosted account and Oracle deployment guide](20_HOSTED_DEPLOYMENT.md); do not expose local mode directly.
 
 ## Local processes
 

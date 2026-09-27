@@ -24,7 +24,7 @@ def create_export(
             "Live verification requires live provider profiles. Fixture demonstrations can only be checked offline.",
             409,
         )
-    store = request.app.state.store
+    store = request.state.store
     with store.session() as s:
         run = scoped(s, Run, run_id)
         if body["verification_mode"] == "live" and run.mode != "live":
@@ -59,13 +59,13 @@ def create_export(
 
 @router.get("/exports/{export_id}")
 def get_export(export_id: str, request: Request):
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         return present(s, scoped(s, Export, export_id))
 
 
 @router.get("/exports/{export_id}/download")
 def download_export(export_id: str, request: Request):
-    store = request.app.state.store
+    store = request.state.store
     with store.session() as s:
         item = scoped(s, Export, export_id)
         if item.status != "ready" or not item.artifact_id:

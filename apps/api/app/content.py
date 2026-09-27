@@ -72,7 +72,7 @@ def sources(
     limit: int = Query(50, ge=1, le=100),
     cursor: str | None = Query(None, max_length=200),
 ):
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         scoped(s, Project, project_id)
         return page_records(s, select(Source).where(Source.project_id == project_id), Source, limit, cursor)
 
@@ -93,7 +93,7 @@ def upload(
         raise Problem("SOURCE_TOO_LARGE", "Each upload must be at most 20 MiB.", 413)
     if not raw or (kind == "pdf") != raw.startswith(b"%PDF-"):
         raise Problem("UNSUPPORTED_SOURCE", "File contents do not match the declared file type.")
-    store = request.app.state.store
+    store = request.state.store
     with store.session() as s:
         scoped(s, Project, project_id, lock=True)
         artifact = store.put(s, project_id, "raw_source", raw, {"format": kind})
@@ -114,7 +114,7 @@ def upload(
 
 @router.get("/sources/{source_id}")
 def source(source_id: str, request: Request):
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         return present(s, scoped(s, Source, source_id))
 
 
@@ -126,7 +126,7 @@ def source_content(
     start_char: int = Query(0, ge=0),
     max_chars: int = Query(8000, ge=1, le=50000),
 ):
-    store = request.app.state.store
+    store = request.state.store
     with store.session() as s:
         source = scoped(s, Source, source_id)
         if source.status != "ready":
@@ -155,7 +155,7 @@ def source_content(
 
 @router.get("/sources/{source_id}/file")
 def source_file(source_id: str, request: Request):
-    store = request.app.state.store
+    store = request.state.store
     with store.session() as s:
         source = scoped(s, Source, source_id)
         if source.status != "ready" or not source.raw_artifact_id:
@@ -177,7 +177,7 @@ def source_file(source_id: str, request: Request):
 @router.post("/projects/{project_id}/corpus-versions", status_code=201)
 def create_corpus(project_id: str, body: dict, request: Request):
     check_request(body, "CreateCorpus")
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         scoped(s, Project, project_id, lock=True)
         sources = [scoped(s, Source, id, project_id) for id in body["source_ids"]]
         if any(source.status != "ready" for source in sources):
@@ -229,7 +229,7 @@ def corpora(
     limit: int = Query(50, ge=1, le=100),
     cursor: str | None = Query(None, max_length=200),
 ):
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         scoped(s, Project, project_id)
         return page_records(
             s, select(Corpus).where(Corpus.project_id == project_id), Corpus, limit, cursor, descending=True
@@ -238,14 +238,14 @@ def corpora(
 
 @router.get("/corpus-versions/{corpus_version_id}")
 def corpus(corpus_version_id: str, request: Request):
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         return present(s, scoped(s, Corpus, corpus_version_id))
 
 
 @router.post("/projects/{project_id}/preparations", status_code=202)
 def prepare(project_id: str, body: dict, request: Request, idempotency_key: str | None = Header(None)):
     check_request(body, "PrepareRequest")
-    store = request.app.state.store
+    store = request.state.store
     with store.session() as s:
         scoped(s, Project, project_id, lock=True)
         existing = idempotent(store, s, project_id, "prepare", idempotency_key, body)
@@ -256,7 +256,7 @@ def prepare(project_id: str, body: dict, request: Request, idempotency_key: str 
         from .deletion import require_corpus_ready
 
         require_corpus_ready(s, corpus)
-        check_config(config.config, request.app.state.profiles)
+        check_config(config.config, request.state.profiles)
         if config.config["technique"] == "pageindex":
             sources = list(
                 s.scalars(
@@ -269,7 +269,7 @@ def prepare(project_id: str, body: dict, request: Request, idempotency_key: str 
                 raise Problem(
                     "UNSUPPORTED_CORPUS", "PageIndex needs a corpus of at most ten text-layer PDFs."
                 )
-        identity = preparation_identity(config.config, corpus.content_fingerprint, request.app.state.profiles)
+        identity = preparation_identity(config.config, corpus.content_fingerprint, request.state.profiles)
         prior = s.scalar(
             select(IndexBundle)
             .where(
@@ -301,11 +301,11 @@ def prepare(project_id: str, body: dict, request: Request, idempotency_key: str 
 
 @router.get("/index-bundles/{bundle_id}")
 def bundle(bundle_id: str, request: Request):
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         return present(s, scoped(s, IndexBundle, bundle_id))
 
 
 @router.get("/jobs/{job_id}")
 def job(job_id: str, request: Request):
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         return present(s, scoped(s, Job, job_id))

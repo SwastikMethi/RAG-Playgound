@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,8 +16,20 @@ class DatabaseRelationPolicy(BaseModel):
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="RAG_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="RAG_", env_file=".env", extra="ignore", hide_input_in_errors=True)
     mode: Literal["live", "fixture", "test"] = "live"
+    deployment: Literal["local", "hosted"] = "local"
+    public_origin: str = ""
+    turnstile_site_key: str = ""
+    turnstile_secret_key: SecretStr = SecretStr("")
+    worker_slots: int = Field(5, ge=1, le=5)
+    max_projects_per_user: int = Field(5, ge=1)
+    max_upload_bytes_per_user: int = Field(500 * 1024**2, ge=1)
+    max_artifact_bytes_per_user: int = Field(2 * 1024**3, ge=1)
+    max_vectors_per_user: int = Field(100_000, ge=1)
+    max_queued_per_user: int = Field(64, ge=1)
+    max_queued_jobs: int = Field(256, ge=1)
+    min_free_bytes: int = Field(20 * 1024**3, ge=0)
     database_url: str = "postgresql+psycopg://rag:local-development-only@127.0.0.1:6544/ragplayground"
     qdrant_url: str = "http://127.0.0.1:6344"
     artifact_root: Path = Path(".data/artifacts")
@@ -36,6 +48,20 @@ class Settings(BaseSettings):
     reranker_revision: str = "233902d25c440f23af6f7d6e94d2946bac0bee0a"
     qdrant_collection_prefix: str = "rag_v1"
     web_dist: Path = Path("apps/web/dist")
+
+    @model_validator(mode="after")
+    def hosted_configuration(self):
+        if self.deployment == "hosted":
+            from urllib.parse import urlsplit
+            from cryptography.fernet import Fernet
+            url = urlsplit(self.public_origin)
+            if (url.scheme != "https" or not url.hostname or url.path or url.query
+                    or url.fragment or url.username or url.password):
+                raise ValueError("Hosted mode requires an exact HTTPS public origin without a trailing slash.")
+            Fernet(self.master_key.get_secret_value().encode())
+            if not self.turnstile_site_key or not self.turnstile_secret_key.get_secret_value():
+                raise ValueError("Hosted mode requires Turnstile site and secret keys.")
+        return self
 
     @field_validator("database_relation_allowlist")
     @classmethod

@@ -12,8 +12,9 @@ import { Button, Empty, ErrorNotice } from "./ui";
 import "./styles.css";
 import { Workspace } from "./Workspace";
 import { Setup } from "./Setup";
+import { AccountGate, type CurrentAccount } from "./Accounts";
 
-function App() {
+function App({ account }: { account: CurrentAccount }) {
   const [error, setError] = useState("");
   const [projects, setProjects] = useState<Project[]>([]);
   const [project, setProject] = useState("");
@@ -129,7 +130,7 @@ function App() {
               Ask a question. Inspect its sources. Choose what works.
             </p>
           </div>
-          <span className="caption">Local workspace</span>
+          <div className="account-actions"><span className="caption">{account.user?.username || "Local workspace"}</span>{account.user && <Button onClick={async () => { try { await post("/auth/logout", {}); location.replace("/login"); } catch (e) { setError((e as Error).message); } }}>Sign out</Button>}</div>
         </header>
         {mode !== "live" && (
           <div className="notice">
@@ -137,7 +138,7 @@ function App() {
           </div>
         )}
         {error && <ErrorNotice message={error} />}
-        {view === "setup" ? <Setup /> : !project ? (
+        {view === "setup" ? <Setup hosted={account.deployment === "hosted"} onKeyChanged={() => { void api<{ items: Capability[] }>("/system/capabilities").then(c => setCapabilities(c.items)); }} /> : !project ? (
           <Empty title="Start with a project">
             <p>Keep a set of documents and comparisons together.</p>
             <form onSubmit={addProject} className="inline-form">
@@ -170,6 +171,6 @@ function App() {
 }
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <AccountGate>{account => <App account={account} />}</AccountGate>
   </React.StrictMode>,
 );

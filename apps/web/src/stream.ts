@@ -1,4 +1,5 @@
 import type { TraceEvent } from "./reducer";
+import { requireSession } from "./api";
 
 export async function streamEvents(
   runId: string,
@@ -10,6 +11,7 @@ export async function streamEvents(
     `/api/v1/runs/${runId}/events?after_seq=${after}`,
     { signal },
   );
+  requireSession(response);
   if (!response.ok)
     throw new Error("The event stream is unavailable.");
   const reader = response.body!.getReader();

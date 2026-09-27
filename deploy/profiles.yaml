@@ -1,0 +1,28 @@
+# Server-controlled models; hosted mode supplies each job owner's encrypted key.
+profiles:
+  - id: openai-answer
+    label: OpenAI · GPT-6 Luna
+    kind: openai
+    model: gpt-6-luna
+    operations: [generation, tree_selection, tree_indexing]
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    max_input_tokens: 32768
+    max_output_tokens: 4096
+    tokenizer: o200k_base
+    supports_temperature: true
+    supports_seed: true
+    completion_token_parameter: max_completion_tokens
+    reasoning_effort: none
+    revision: "hosted-1"
+  - id: openai-embedding
+    label: OpenAI · Text embedding 3 large
+    kind: openai
+    model: text-embedding-3-large
+    operations: [embedding]
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    max_input_tokens: 8191
+    dimensions: 3072
+    tokenizer: cl100k_base
+    revision: "1"

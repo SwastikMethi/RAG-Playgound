@@ -1,7 +1,14 @@
 .DS_Store
 .env
+.env.*
+!.env.example
+!.env.production.example
+.implementation/
+.backup.lock
 .venv/
+.venv
 node_modules/
+node_modules
 dist/
 __pycache__/
 *.py[cod]

@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 
 import yaml
 import httpx
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import PrivateAttr, SecretStr, BaseModel, ConfigDict, Field
 
 from .contracts import digest
 from .errors import Problem
@@ -40,16 +40,23 @@ class Profile(BaseModel):
     reasoning_effort: Literal["none", "minimal", "low", "medium", "high", "xhigh", "max"] | None = None
     revision: str = "1"
 
+    _credential: SecretStr | None = PrivateAttr(default=None)
+
+    def with_key(self, key):
+        profile = self.model_copy()
+        profile._credential = SecretStr(key)
+        return profile
+
     @property
     def key(self):
-        return os.environ.get(self.api_key_env, "")
+        return self._credential.get_secret_value() if self._credential is not None else os.environ.get(self.api_key_env, "")
 
     @property
     def unavailable_reason(self):
         if self.kind == "fixture":
             return None
         if not self.key:
-            return "Configure the server-side credential for this profile."
+            return "Configure an OpenAI key in Setup for this profile."
         if "embedding" in self.operations and (not self.dimensions or not self.tokenizer):
             return "Embedding dimensions and a compatible tokenizer must be configured."
         if {"generation", "tree_selection", "tree_indexing"}.intersection(self.operations) and (
@@ -121,6 +128,8 @@ def load_profiles(settings):
     for raw in (data or {}).get("profiles", []):
         profile = Profile.model_validate(raw)
         url = urlsplit(profile.base_url)
+        if getattr(settings, "deployment", "local") == "hosted" and profile.base_url != "https://api.openai.com/v1":
+            raise Problem("VALIDATION_ERROR", "Hosted accounts require the official HTTPS OpenAI API endpoint.")
         if profile.kind != "openai" or url.scheme not in {"https", "http"} or not url.hostname:
             raise Problem(
                 "VALIDATION_ERROR", "Live profiles require an explicit compatible provider endpoint."
@@ -140,7 +149,7 @@ def load_profiles(settings):
             raise Problem("VALIDATION_ERROR", "Metadata service endpoints are not permitted.")
         if profile.id in profiles:
             raise Problem("VALIDATION_ERROR", "Provider profile identifiers must be unique.")
-        profiles[profile.id] = profile
+        profiles[profile.id] = profile.with_key("") if getattr(settings, "deployment", "local") == "hosted" else profile
     return profiles
 
 

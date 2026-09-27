@@ -253,7 +253,7 @@ async def export_lane(worker, claim):
                 snapshot_profiles = json.loads(store.read(s, artifact.id, item.project_id))
         if recordings is None:
             raise Problem("REPLAY_UNAVAILABLE", "This lane has no complete boundary recording.")
-        snapshot_profiles = snapshot_profiles or [p.model_dump() for p in worker.profiles.values()]
+        snapshot_profiles = snapshot_profiles or [p.model_dump() for p in claim["profiles"].values()]
         profile_map = {p["id"]: p for p in snapshot_profiles}
         config, portable_profiles = portable_configuration(lane.config_snapshot, profile_map)
         corpus = scoped(s, Corpus, run.corpus_version_id, item.project_id)
@@ -319,11 +319,11 @@ async def export_lane(worker, claim):
         )
         if mode == "live":
             request["mode"] = "live"
-            # Current profiles must still match saved fingerprints; secrets are read only from the environment.
+            # Pass this owner's credentials only to this isolated verification process.
             for profile in snapshot_profiles:
                 if (
-                    profile["id"] not in worker.profiles
-                    or worker.profiles[profile["id"]].fingerprint()
+                    profile["id"] not in claim["profiles"]
+                    or claim["profiles"][profile["id"]].fingerprint()
                     != Profile.model_validate(profile).fingerprint()
                 ):
                     raise Problem(
@@ -331,7 +331,8 @@ async def export_lane(worker, claim):
                         "A provider profile changed since this lane. Save and run a new revision.",
                     )
             live = await run_json(
-                [str(folder / "scripts/verify.py")], input_data=request, root=folder, timeout=300
+                [str(folder / "scripts/verify.py")], input_data=request, root=folder, timeout=300,
+                env_extra={p.api_key_env: p.key for p in claim["profiles"].values() if p.api_key_env}
             )
             manifest["verification"]["live_replay"] = dict(
                 status="passed",

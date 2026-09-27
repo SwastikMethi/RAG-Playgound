@@ -1120,3 +1120,25 @@ dd {
 .setup-status{max-width:800px}.setup-status>details{padding:12px 0;border-bottom:1px solid var(--border)}.setup-status>p{margin-bottom:12px}
 @media(max-width:700px){.rail nav button{font-size:12px;gap:5px}.rail nav button svg{width:15px;height:15px}}
 @media(max-width:700px){.rail{padding:12px 16px;gap:10px}.rail .brand{font-size:14px}.rail>.button{font-size:0;width:40px;min-width:40px;padding:8px}.rail .new-project{font-size:12px;order:0}.rail .new-project[open]{flex-basis:100%;order:4}.rail>label{order:2;gap:0}.rail>label>span{display:none}.rail nav{flex-basis:100%;order:3;gap:6px}.rail nav button{flex:1;justify-content:center;padding:8px}.workspace{padding:20px 16px}.page-heading{margin-bottom:16px}.source-name{flex-basis:120px}.source-row .status{margin-left:auto}.comparison-setup{padding:12px}.lane-tools{gap:8px}.question-box .caption{max-width:55%;font-size:12px}}
+
+/* Account screens share workspace colors, controls and spacing. */
+.auth-shell { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px; padding:40px 20px; }
+.auth-brand { display:flex; align-items:center; gap:10px; font-size:18px; font-weight:650; color:var(--ink); text-decoration:none; }
+.auth-card { width:100%; max-width:460px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:32px; }
+.auth-card h1 { font-size:26px; line-height:1.25; margin:10px 0 16px; }
+.auth-card p, .account-settings p { line-height:1.6; }
+.account-form { display:grid; gap:16px; margin-top:24px; }
+.account-form label { display:grid; gap:6px; font-weight:550; }
+.account-form input { width:100%; min-width:0; box-sizing:border-box; font-size:16px; }
+.account-form .caption { margin: -8px 0 0; }
+.auth-links { display:flex; gap:20px; justify-content:space-between; flex-wrap:wrap; margin-top:24px; }
+.auth-links a { color:var(--accent); }
+.auth-footnote { max-width:440px; text-align:center; color:var(--muted); font-size:13px; }
+.recovery-code { display:block; padding:16px; margin:20px 0; background:var(--canvas); border:1px solid var(--border); border-radius:var(--radius); overflow-wrap:anywhere; user-select:all; font-size:16px; }
+.check-row { display:flex; gap:8px; align-items:flex-start; margin:20px 0; }
+.check-row input { width:18px; height:18px; min-height:0; flex:0 0 18px; margin:3px 0 0; padding:0; }
+.account-actions { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.account-settings { max-width:640px; padding-bottom:24px; margin-bottom:24px; border-bottom:1px solid var(--border); }
+.password-settings { margin-top:24px; }
+.security-check { min-height:65px; max-width:100%; }
+@media(max-width:600px) { .auth-shell { padding:24px 16px; justify-content:flex-start; } .auth-card { padding:24px 20px; } .auth-card h1 { font-size:24px; } }

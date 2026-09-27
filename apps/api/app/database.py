@@ -1,20 +1,27 @@
 import os
 from contextlib import contextmanager
+from copy import copy
 from datetime import timedelta
 from pathlib import Path
 
-from sqlalchemy import create_engine, func, select, text
+from sqlalchemy import create_engine, event, func, select, text
 from sqlalchemy.orm import Session
 
 from rag_runtime.contracts import digest
 from rag_runtime.errors import Problem
-from .models import Artifact, Job, uid
+from .models import Artifact, AuthSession, Job, Project, uid
 
 
 def scoped(session, model, resource_id, project_id=None, lock=False):
     query = select(model).where(model.id == resource_id)
     if project_id is not None:
         query = query.where(model.project_id == project_id)
+    owner = session.info.get("owner_id")
+    if owner is not None:
+        if model is Project:
+            query = query.where(Project.owner_id == owner)
+        else:
+            query = query.where(model.project_id.in_(select(Project.id).where(Project.owner_id == owner)))
     row = session.scalar(query.with_for_update() if lock else query)
     if row is None:
         raise Problem("NOT_FOUND", "This resource is unavailable in the selected project.", 404)
@@ -22,17 +29,36 @@ def scoped(session, model, resource_id, project_id=None, lock=False):
 
 
 class Store:
-    def __init__(self, url, artifact_root=Path(".data/artifacts"), lease_seconds=30):
+    def __init__(self, url, artifact_root=Path(".data/artifacts"), lease_seconds=30, settings=None):
         self.engine = create_engine(url, pool_pre_ping=True, pool_size=10, max_overflow=10)
         self.root = Path(artifact_root).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self.lease_seconds = lease_seconds
+        self.settings = settings
+        self.owner_id = self.session_hash = None
+
+    def for_user(self, owner_id, session_hash):
+        scoped_store = copy(self)
+        scoped_store.owner_id, scoped_store.session_hash = owner_id, session_hash
+        return scoped_store
 
     @contextmanager
     def session(self):
         with Session(self.engine, expire_on_commit=False) as session:
             try:
                 with session.begin():
+                    session.info["store"] = self
+                    if self.settings and self.settings.deployment == "hosted":
+                        # ponytail: serialize short metadata transactions for atomic quotas across API/worker.
+                        # Split admission locks by account if measured contention warrants it.
+                        from .quotas import admission
+                        session.execute(text("SELECT pg_advisory_xact_lock(71234005)"))
+                        event.listen(session, "before_flush", admission)
+                    if self.owner_id is not None:
+                        auth = session.get(AuthSession, self.session_hash)
+                        if not auth or auth.user_id != self.owner_id or auth.expires_at <= self.now(session):
+                            raise Problem("UNAUTHENTICATED", "Sign in to continue.", 401)
+                        session.info["owner_id"] = self.owner_id
                     yield session
             except BaseException:
                 for path in session.info.get("created_paths", []):
@@ -105,6 +131,9 @@ class Store:
         return path
 
     def put(self, session, project_id, kind, content: bytes, manifest=None):
+        if self.settings and self.settings.deployment == "hosted":
+            from .quotas import artifact_admission
+            artifact_admission(self, session, project_id, kind, len(content))
         artifact_id = uid()
         relative = f"{project_id}/{artifact_id}"
         target = self.root / relative

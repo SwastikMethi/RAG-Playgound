@@ -11,7 +11,7 @@ pytestmark = pytest.mark.integration
 def test_qdrant_queries_and_deletes_require_exact_immutable_scope():
     from rag_runtime.vectors import Scope, VectorStore
 
-    store = VectorStore("http://127.0.0.1:6344", prefix="rag_test")
+    store = VectorStore("http://127.0.0.1:6344", prefix="rag_test_" + uuid4().hex)
     project = uuid4().hex
     a, b = Scope(project, "corpus_a", "variant"), Scope(project, "corpus_b", "variant")
     chunks = [dict(candidate_id="a"), dict(candidate_id="b")]
@@ -19,6 +19,9 @@ def test_qdrant_queries_and_deletes_require_exact_immutable_scope():
     async def check():
         try:
             await store.put(a, chunks, [[1.0, 0.0], [0.0, 1.0]], 2)
+            info = store.client.get_collection(store.collection(2))
+            assert info.config.params.vectors.on_disk is True
+            assert info.config.hnsw_config.on_disk is True
             await store.put(b, [dict(candidate_id="foreign")], [[1.0, 0.0]], 2)
             hits = await store.search(a, [1.0, 0.0], 2, dict(mode="exact", hnsw_ef=None, min_score=None))
             assert [h["candidate_id"] for h in hits] == ["a", "b"]

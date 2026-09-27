@@ -71,7 +71,8 @@ class VectorStore:
                 await asyncio.to_thread(
                     self.client.create_collection,
                     collection,
-                    vectors_config=models.VectorParams(size=dimensions, distance=models.Distance.COSINE),
+                    vectors_config=models.VectorParams(size=dimensions, distance=models.Distance.COSINE, on_disk=True),
+                    hnsw_config=models.HnswConfigDiff(on_disk=True),
                 )
             except UnexpectedResponse as exc:
                 if exc.status_code != 409:

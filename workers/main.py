@@ -11,6 +11,8 @@ from sqlalchemy import select
 from app.database import Store, scoped
 from app.models import (
     Artifact,
+    Project,
+    User,
     Chunk,
     Configuration,
     Connection,
@@ -42,7 +44,7 @@ from .events import RunWriter, persist_event
 class Worker:
     def __init__(self, settings):
         self.settings = settings
-        self.store = Store(settings.database_url, settings.artifact_root, settings.lease_seconds)
+        self.store = Store(settings.database_url, settings.artifact_root, settings.lease_seconds, settings)
         self.profiles = load_profiles(settings)
         self.gateway = Gateway(settings.provider_concurrency, settings.embedding_concurrency)
         self.vectors = None
@@ -272,7 +274,17 @@ class Worker:
         }.get(claim["kind"])
         if handler is None:
             raise Problem("UNKNOWN_JOB", "This worker does not support the job type.")
-        task = asyncio.create_task(handler(claim))
+        async def owned_handler():
+            from app.auth import user_profiles
+            with self.store.session() as s:
+                project = scoped(s, Project, claim["project_id"])
+                user = s.get(User, project.owner_id) if project.owner_id else None
+                if self.settings.deployment == "hosted" and user is None:
+                    raise Problem("NOT_FOUND", "This job has no hosted owner.", 404)
+                claim["profiles"] = user_profiles(self.settings, self.profiles, user)
+            await handler(claim)
+
+        task = asyncio.create_task(owned_handler())
         watcher = asyncio.create_task(self.watch(claim, task))
         error = None
         try:
@@ -440,9 +452,9 @@ class Worker:
             bundle = scoped(s, IndexBundle, claim["resource_id"], claim["project_id"])
             config = scoped(s, Configuration, bundle.config_id, bundle.project_id).config
             corpus = scoped(s, Corpus, bundle.corpus_version_id, bundle.project_id)
-            check_config(config, self.profiles)
+            check_config(config, claim["profiles"])
             if bundle.requirements_sha256 != preparation_identity(
-                config, corpus.content_fingerprint, self.profiles
+                config, corpus.content_fingerprint, claim["profiles"]
             ):
                 raise Problem(
                     "PROFILE_CHANGED", "The provider profile changed after preparation was requested."
@@ -494,11 +506,13 @@ class Worker:
                         scoped(s, Artifact, src.raw_artifact_id, claim["project_id"])
                     )
         prepared = await prepare_sources(
-            sources, config, scope, self.profiles, self.gateway, raw_paths=raw_paths, root=self.store.root
+            sources, config, scope, claim["profiles"], self.gateway, raw_paths=raw_paths, root=self.store.root
         )
         if config["embedding"]:
             with self.store.session() as s:
-                self.store.owned(s, claim["id"], claim["owner_token"])
+                from app.quotas import reserve_vectors
+                job = self.store.owned(s, claim["id"], claim["owner_token"])
+                reserve_vectors(self.store, s, job, len(prepared["chunks"]))
             await self.vector_store().put(
                 Scope(**scope), prepared["chunks"], prepared["vectors"], config["embedding"]["dimensions"]
             )
@@ -593,7 +607,7 @@ class Worker:
                     question,
                     lane.config_snapshot,
                     prepared,
-                    self.profiles,
+                    claim["profiles"],
                     self.gateway,
                     emit,
                     result,
@@ -614,7 +628,7 @@ class Worker:
                     s,
                     claim["project_id"],
                     "provider_profiles",
-                    canonical([p.model_dump() for p in self.profiles.values()]),
+                    canonical([p.model_dump() for p in claim["profiles"].values()]),
                     dict(lane_id=lane.id, run_id=claim["resource_id"]),
                 )
                 saved.provenance = dict(
@@ -678,7 +692,7 @@ async def main():
                 await asyncio.sleep(0.25)
 
     try:
-        await asyncio.gather(*(slot() for _ in range(5)))
+        await asyncio.gather(*(slot() for _ in range(worker.settings.worker_slots)))
     finally:
         worker.close()
 

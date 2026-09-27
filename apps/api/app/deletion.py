@@ -98,7 +98,7 @@ def dependencies(s, source):
 
 @router.get("/sources/{source_id}/impact")
 def impact(source_id: str, request: Request):
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         source = scoped(s, Source, source_id)
         d = dependencies(s, source)
         return dict(
@@ -115,7 +115,7 @@ def impact(source_id: str, request: Request):
 def request_deletion(source_id: str, cascade: bool, confirmation_source_id: str, request: Request):
     if not cascade or confirmation_source_id != source_id:
         raise Problem("CONFIRMATION_REQUIRED", "Confirm this exact source and its dependent content.")
-    store = request.app.state.store
+    store = request.state.store
     with store.session() as s:
         source = scoped(s, Source, source_id)
         scoped(s, Project, source.project_id, lock=True)

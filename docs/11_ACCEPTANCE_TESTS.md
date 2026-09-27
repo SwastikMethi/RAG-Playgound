@@ -121,3 +121,18 @@ If no credentials or model weights are available, CI may pass deterministic chec
 - Security and deletion gates pass; secrets are absent from artifacts and operational logs.
 - Setup commands, migrations, environment examples and supported limits are documented.
 - Unperformed external checks and later backlog items are listed precisely.
+
+## Hosted beta launch gates
+
+These gates apply only to `RAG_DEPLOYMENT=hosted`; local S01 behavior stays unchanged.
+
+| ID | Check | Required result |
+|---|---|---|
+| H01 | Signup, login, password change, logout, recovery | Argon2id password hash; hashed random session/recovery tokens; recovery rotates once and revokes old sessions |
+| H02 | No session, expired/revoked session, missing Origin/CSRF | Data denied; health stays public; an existing event stream stops after revocation |
+| H03 | Two users reference each other's resource IDs | No projects, source bytes, events, evidence, vectors, connection secrets or exports cross owners |
+| H04 | Different user keys; missing/removed key; simultaneous jobs | Each job uses its owner's key; no environment fallback; keys encrypted and omitted from responses/logs/ZIPs |
+| H05 | Parallel uploads, queued jobs, vector quota, low disk | Atomic limits with actionable failure and no partial metadata/files; deletion remains possible |
+| H06 | Live six-technique run and dense/tree exports | Real providers, evidence, ordered events and standalone replay succeed; fixtures clearly distinguished |
+| H07 | ARM startup, parser/reranker, restart and isolated restore | Consistent artifact hashes, decryptable credentials and scoped vector counts survive; proxy is the only public service |
+| H08 | Real hostname/TLS/Turnstile and OCI volume backup restore | Verify after account/VM setup; local mocks/config validation cannot satisfy this gate |

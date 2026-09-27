@@ -87,7 +87,7 @@ def create_run(project_id: str, body: dict, request: Request, idempotency_key: s
     check_request(body, "CreateRun")
     if not body["question"].strip():
         raise Problem("VALIDATION_ERROR", "Enter a question.")
-    store, profiles = request.app.state.store, request.app.state.profiles
+    store, profiles = request.state.store, request.state.profiles
     with store.session() as s:
         scoped(s, Project, project_id, lock=True)
         prior = idempotent(store, s, project_id, "run", idempotency_key, body)
@@ -166,7 +166,7 @@ def create_run(project_id: str, body: dict, request: Request, idempotency_key: s
 
 @router.get("/runs/{run_id}")
 def run(run_id: str, request: Request):
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         return present(s, scoped(s, Run, run_id))
 
 
@@ -179,7 +179,7 @@ def history(
     q: str = Query("", max_length=8000),
     status: str | None = None,
 ):
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         scoped(s, Project, project_id)
         query = select(Run).where(Run.project_id == project_id)
         if status:
@@ -212,7 +212,7 @@ async def events(
     after_seq: int | None = Query(None, ge=0),
     last_event_id: str | None = Header(None),
 ):
-    store = request.app.state.store
+    store = request.state.store
     cursor = after_seq or 0
     if last_event_id:
         try:
@@ -254,12 +254,23 @@ async def events(
                 heartbeat = time.monotonic()
             await asyncio.sleep(0.25)
 
-    return StreamingResponse(frames(), media_type="text/event-stream", headers={"X-Accel-Buffering": "no"})
+    async def authorized_frames():
+        try:
+            async for frame in frames():
+                if store.owner_id is not None:
+                    with store.session() as s:
+                        scoped(s, Run, run_id)
+                yield frame
+        except Problem as error:
+            if error.status not in {401, 404}:
+                raise
+
+    return StreamingResponse(authorized_frames(), media_type="text/event-stream", headers={"X-Accel-Buffering": "no"})
 
 
 @router.get("/runs/{run_id}/lanes/{lane_id}/evidence")
 def evidence(run_id: str, lane_id: str, request: Request):
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         _, lane = lane_in_run(s, run_id, lane_id)
         return validate(
             dict(run_id=run_id, lane_id=lane_id, evidence=lane.evidence), "openapi.yaml", "EvidenceList"
@@ -269,11 +280,11 @@ def evidence(run_id: str, lane_id: str, request: Request):
 @router.put("/runs/{run_id}/lanes/{lane_id}/feedback")
 def feedback(run_id: str, lane_id: str, body: dict, request: Request):
     check_request(body, "Feedback")
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         lane_in_run(s, run_id, lane_id)
         row = s.get(Feedback, lane_id) or Feedback(run_id=run_id, lane_id=lane_id)
         row.helpful, row.note = body["helpful"], body["note"]
-        row.updated_at = request.app.state.store.now(s)
+        row.updated_at = request.state.store.now(s)
         s.add(row)
         return body
 
@@ -283,21 +294,21 @@ def preference(run_id: str, body: dict, request: Request):
     check_request(body, "Preference")
     if body["preferred_lane_id"] and body["tied_lane_ids"]:
         raise Problem("VALIDATION_ERROR", "Choose one preferred lane or a tie.")
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         scoped(s, Run, run_id, lock=True)
         for id in [body["preferred_lane_id"]] if body["preferred_lane_id"] else body["tied_lane_ids"]:
             lane_in_run(s, run_id, id)
         row = s.get(Preference, run_id) or Preference(run_id=run_id)
         for key, value in body.items():
             setattr(row, key, value)
-        row.updated_at = request.app.state.store.now(s)
+        row.updated_at = request.state.store.now(s)
         s.add(row)
         return body
 
 
 @router.get("/runs/{run_id}/lanes/{lane_id}/artifacts/{artifact_id}")
 def trace_artifact(run_id: str, lane_id: str, artifact_id: str, request: Request):
-    store = request.app.state.store
+    store = request.state.store
     with store.session() as s:
         run, lane = lane_in_run(s, run_id, lane_id)
         artifact = scoped(s, Artifact, artifact_id, run.project_id)

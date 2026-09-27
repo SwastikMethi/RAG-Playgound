@@ -13,7 +13,7 @@ from .contracts import canonical
 from .errors import Problem
 
 
-async def run_json(arguments, timeout=120, memory_mb=2048, root=None, input_data=None):
+async def run_json(arguments, timeout=120, memory_mb=2048, root=None, input_data=None, env_extra=None):
     with tempfile.TemporaryDirectory(prefix="job-", dir=root) as temporary:
         if input_data is not None:
             request_path = Path(temporary) / "request.json"
@@ -22,6 +22,7 @@ async def run_json(arguments, timeout=120, memory_mb=2048, root=None, input_data
         output_path = Path(temporary) / "result.json"
         with output_path.open("wb") as output:
             env = dict(os.environ, PYTHONPATH=os.pathsep.join(sys.path), HF_HUB_OFFLINE="1")
+            env.update(env_extra or {})
             process = await asyncio.create_subprocess_exec(
                 sys.executable,
                 *arguments,

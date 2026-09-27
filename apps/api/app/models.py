@@ -27,7 +27,30 @@ class Identity:
 class Project(Identity, Base):
     __tablename__ = "projects"
     name: Mapped[str] = mapped_column(String(120))
+    owner_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class User(Identity, Base):
+    __tablename__ = "users"
+    username: Mapped[str] = mapped_column(String(32), unique=True)
+    password_hash: Mapped[str] = mapped_column(Text)
+    recovery_hash: Mapped[str] = mapped_column(String(64))
+    encrypted_openai_key: Mapped[str | None] = mapped_column(Text)
+
+
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class AuthRate(Base):
+    __tablename__ = "auth_rates"
+    bucket: Mapped[str] = mapped_column(String(64), primary_key=True)
+    attempts: Mapped[int] = mapped_column(Integer)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
 
 class Artifact(Identity, Base):

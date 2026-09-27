@@ -4,7 +4,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from starlette.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from sqlalchemy import func, select, text
@@ -26,6 +27,7 @@ from .models import Configuration, Project
 from .present import page_records, present
 from .settings import Settings
 from .security import BoundedBody
+from . import auth
 
 
 def create_app(settings=None):
@@ -34,7 +36,8 @@ def create_app(settings=None):
         app.state.settings = settings or Settings()
         cfg = app.state.settings
         app.state.profiles = load_profiles(cfg)
-        app.state.store = Store(cfg.database_url, cfg.artifact_root, cfg.lease_seconds)
+        app.state.store = Store(cfg.database_url, cfg.artifact_root, cfg.lease_seconds, cfg)
+        app.state.dummy_password_hash = auth.hash_password("unavailable-account-placeholder")
         yield
         app.state.store.engine.dispose()
 
@@ -44,14 +47,22 @@ def create_app(settings=None):
     async def boundary(request: Request, call_next):
         started, request_id = time.monotonic(), str(uuid4())
         path = request.url.path
+        cfg = app.state.settings
         if path.startswith("/api/") and path != "/api/v1/health":
             origin = request.headers.get("origin")
-            if origin and origin.rstrip("/") != str(request.base_url).rstrip("/"):
+            expected = cfg.public_origin if cfg.deployment == "hosted" else str(request.base_url).rstrip("/")
+            if ((origin and origin.rstrip("/") != expected) or
+                    (cfg.deployment == "hosted" and request.method not in {"GET", "HEAD", "OPTIONS"} and origin != expected)):
                 return JSONResponse(
                     {"error": Problem("FORBIDDEN", "This request must use the same origin.", 403).public()},
                     403,
                 )
-        response = await call_next(request)
+        try:
+            if path.startswith("/api/"):
+                await run_in_threadpool(auth.request_identity, request)
+            response = await call_next(request)
+        except Problem as error:
+            response = JSONResponse({"error": error.public()}, status_code=error.status)
         if path.startswith("/api/"):
             log_event(
                 "http",
@@ -70,6 +81,8 @@ def create_app(settings=None):
                 "Cache-Control": "no-store" if path.startswith("/api/") else "no-cache",
             }
         )
+        if path in {"/login", "/signup", "/recover"}:
+            response.headers["Content-Security-Policy"] = response.headers["Content-Security-Policy"].replace("script-src 'self'", "script-src 'self' https://challenges.cloudflare.com") + "; frame-src https://challenges.cloudflare.com"
         return response
 
     app.add_middleware(BoundedBody)
@@ -128,41 +141,45 @@ def create_app(settings=None):
         return dict(status=status, version=__version__)
 
     @app.get("/api/v1/system/profiles")
-    def profiles():
-        return dict(items=[p.public() for p in app.state.profiles.values()])
+    def profiles(request: Request):
+        return dict(items=[p.public() for p in request.state.profiles.values()])
 
     @app.get("/api/v1/system/capabilities")
-    def registry():
-        return capabilities(app.state.profiles, app.state.settings)
+    def registry(request: Request):
+        return capabilities(request.state.profiles, app.state.settings)
 
     @app.get("/api/v1/projects")
-    def projects(limit: int = Query(50, ge=1, le=100), cursor: str | None = Query(None, max_length=200)):
-        with app.state.store.session() as s:
-            return page_records(s, select(Project), Project, limit, cursor)
+    def projects(request: Request, limit: int = Query(50, ge=1, le=100), cursor: str | None = Query(None, max_length=200)):
+        with request.state.store.session() as s:
+            query = select(Project)
+            if request.state.store.owner_id is not None:
+                query = query.where(Project.owner_id == request.state.store.owner_id)
+            return page_records(s, query, Project, limit, cursor)
 
     @app.post("/api/v1/projects", status_code=201)
-    def create_project(body: dict):
+    def create_project(body: dict, request: Request):
         check_request(body, "CreateProject")
         if not body["name"].strip():
             raise Problem("VALIDATION_ERROR", "Enter a project name.")
-        with app.state.store.session() as s:
-            project = Project(name=body["name"].strip())
+        with request.state.store.session() as s:
+            project = Project(name=body["name"].strip(), owner_id=request.state.store.owner_id)
             s.add(project)
             s.flush()
             return present(s, project)
 
     @app.get("/api/v1/projects/{project_id}")
-    def project(project_id: str):
-        with app.state.store.session() as s:
+    def project(project_id: str, request: Request):
+        with request.state.store.session() as s:
             return present(s, scoped(s, Project, project_id))
 
     @app.get("/api/v1/projects/{project_id}/configurations")
     def configurations(
         project_id: str,
+        request: Request,
         limit: int = Query(50, ge=1, le=100),
         cursor: str | None = Query(None, max_length=200),
     ):
-        with app.state.store.session() as s:
+        with request.state.store.session() as s:
             scoped(s, Project, project_id)
             return page_records(
                 s,
@@ -173,10 +190,10 @@ def create_app(settings=None):
             )
 
     @app.post("/api/v1/projects/{project_id}/configurations", status_code=201)
-    def save_configuration(project_id: str, body: dict):
+    def save_configuration(project_id: str, body: dict, request: Request):
         check_request(body, "SaveConfiguration")
-        check_config(body["config"], app.state.profiles, require_available=False)
-        with app.state.store.session() as s:
+        check_config(body["config"], request.state.profiles, require_available=False)
+        with request.state.store.session() as s:
             scoped(s, Project, project_id, lock=True)
             config = Configuration(
                 project_id=project_id,
@@ -197,9 +214,17 @@ def create_app(settings=None):
             return present(s, config)
 
     @app.get("/api/v1/configurations/{config_id}")
-    def configuration(config_id: str):
-        with app.state.store.session() as s:
+    def configuration(config_id: str, request: Request):
+        with request.state.store.session() as s:
             return present(s, scoped(s, Configuration, config_id))
+
+    app.include_router(auth.router)
+
+    @app.get("/login", include_in_schema=False)
+    @app.get("/signup", include_in_schema=False)
+    @app.get("/recover", include_in_schema=False)
+    def auth_page():
+        return FileResponse(app.state.settings.web_dist / "index.html")
 
     app.include_router(content_router)
     app.include_router(runs_router)

@@ -3,8 +3,8 @@ jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: RAG Playground API
   version: 1.0.0
-  description: Single-owner playground API. This is an implementation contract, not
-    a running service. Local access requires no application token; cross-origin requests are denied.
+  description: Same-origin playground API. Hosted mode requires a user session and X-CSRF-Token on authenticated
+    mutations. Local loopback mode remains token-free.
 servers:
 - url: /api/v1
 security: []
@@ -68,6 +68,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Health'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       security: []
   /projects:
     get:
@@ -144,9 +156,20 @@ paths:
                 - items
                 - next_cursor
                 additionalProperties: false
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
-      - &id002
-        name: limit
+      - name: limit
         in: query
         required: false
         schema:
@@ -154,14 +177,15 @@ paths:
           minimum: 1
           maximum: 100
           default: 50
-      - &id003
-        name: cursor
+      - name: cursor
         in: query
         required: false
         schema:
           type: string
           minLength: 1
           maxLength: 200
+      security:
+      - CookieSession: []
     post:
       operationId: createProject
       summary: Create a project
@@ -220,12 +244,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Project'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateProject'
+      security:
+      - CookieSession: []
   /projects/{project_id}:
     get:
       operationId: getProject
@@ -285,14 +323,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Project'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: project_id
         in: path
         required: true
-        schema: &id001
+        schema:
           type: string
           minLength: 1
           maxLength: 128
+      security:
+      - CookieSession: []
   /projects/{project_id}/sources:
     get:
       operationId: listSources
@@ -368,13 +420,43 @@ paths:
                 - items
                 - next_cursor
                 additionalProperties: false
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: project_id
         in: path
         required: true
-        schema: *id001
-      - *id002
-      - *id003
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 200
+      security:
+      - CookieSession: []
   /projects/{project_id}/sources/upload:
     post:
       operationId: uploadSource
@@ -434,17 +516,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Source'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: project_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/UploadSource'
+      security:
+      - CookieSession: []
   /sources/{source_id}:
     get:
       operationId: getSource
@@ -504,11 +603,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Source'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: source_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      security:
+      - CookieSession: []
     delete:
       operationId: deleteSource
       summary: Delete source and confirmed dependent content
@@ -567,11 +683,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/JobAccepted'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: source_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       - name: cascade
         in: query
         required: true
@@ -581,7 +712,12 @@ paths:
       - name: confirmation_source_id
         in: query
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      security:
+      - CookieSession: []
   /sources/{source_id}/content:
     get:
       operationId: getSourceContent
@@ -641,11 +777,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SourcePreview'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: source_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       - name: page
         in: query
         required: false
@@ -666,6 +817,8 @@ paths:
           minimum: 1
           maximum: 50000
           default: 8000
+      security:
+      - CookieSession: []
   /sources/{source_id}/file:
     get:
       operationId: getSourceFile
@@ -734,11 +887,28 @@ paths:
               schema:
                 type: string
                 format: binary
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: source_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      security:
+      - CookieSession: []
   /sources/{source_id}/impact:
     get:
       operationId: getSourceImpact
@@ -798,11 +968,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SourceImpact'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: source_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      security:
+      - CookieSession: []
   /projects/{project_id}/connections:
     get:
       operationId: listConnections
@@ -878,13 +1065,43 @@ paths:
                 - items
                 - next_cursor
                 additionalProperties: false
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: project_id
         in: path
         required: true
-        schema: *id001
-      - *id002
-      - *id003
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 200
+      security:
+      - CookieSession: []
     post:
       operationId: createConnection
       summary: Store an encrypted PostgreSQL connection
@@ -943,17 +1160,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PublicConnection'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: project_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateConnection'
+      security:
+      - CookieSession: []
   /connections/{connection_id}:
     get:
       operationId: getConnection
@@ -1013,11 +1247,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PublicConnection'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: connection_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      security:
+      - CookieSession: []
     delete:
       operationId: deleteConnection
       summary: Remove connection credentials; preserve captured snapshots
@@ -1072,11 +1323,28 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '204':
           description: Success
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: connection_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      security:
+      - CookieSession: []
   /connections/{connection_id}/relations:
     get:
       operationId: listRelations
@@ -1145,11 +1413,28 @@ paths:
                 required:
                 - items
                 additionalProperties: false
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: connection_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      security:
+      - CookieSession: []
   /projects/{project_id}/sources/postgres:
     post:
       operationId: capturePostgres
@@ -1209,17 +1494,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Source'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: project_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/CapturePostgres'
+      security:
+      - CookieSession: []
   /projects/{project_id}/corpus-versions:
     post:
       operationId: createCorpus
@@ -1279,17 +1581,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Corpus'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: project_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateCorpus'
+      security:
+      - CookieSession: []
     get:
       operationId: listCorpora
       summary: List frozen corpus versions
@@ -1364,13 +1683,43 @@ paths:
                 - items
                 - next_cursor
                 additionalProperties: false
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: project_id
         in: path
         required: true
-        schema: *id001
-      - *id002
-      - *id003
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 200
+      security:
+      - CookieSession: []
   /corpus-versions/{corpus_version_id}:
     get:
       operationId: getCorpus
@@ -1430,11 +1779,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Corpus'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: corpus_version_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      security:
+      - CookieSession: []
   /projects/{project_id}/configurations:
     get:
       operationId: listConfigurations
@@ -1510,13 +1876,43 @@ paths:
                 - items
                 - next_cursor
                 additionalProperties: false
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: project_id
         in: path
         required: true
-        schema: *id001
-      - *id002
-      - *id003
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 200
+      security:
+      - CookieSession: []
     post:
       operationId: saveConfiguration
       summary: Create an immutable configuration revision
@@ -1575,17 +1971,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Configuration'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: project_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/SaveConfiguration'
+      security:
+      - CookieSession: []
   /configurations/{config_id}:
     get:
       operationId: getConfiguration
@@ -1645,11 +2058,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Configuration'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: config_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      security:
+      - CookieSession: []
   /projects/{project_id}/preparations:
     post:
       operationId: prepareConfiguration
@@ -1709,11 +2139,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/IndexBundle'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: project_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       - name: Idempotency-Key
         in: header
         required: true
@@ -1728,6 +2173,8 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PrepareRequest'
+      security:
+      - CookieSession: []
   /index-bundles/{bundle_id}:
     get:
       operationId: getIndexBundle
@@ -1787,11 +2234,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/IndexBundle'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: bundle_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      security:
+      - CookieSession: []
   /projects/{project_id}/runs:
     post:
       operationId: createRun
@@ -1851,11 +2315,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Run'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: project_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       - name: Idempotency-Key
         in: header
         required: true
@@ -1870,6 +2349,8 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateRun'
+      security:
+      - CookieSession: []
     get:
       operationId: listRuns
       summary: List comparison history
@@ -1944,13 +2425,41 @@ paths:
                 - items
                 - next_cursor
                 additionalProperties: false
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: project_id
         in: path
         required: true
-        schema: *id001
-      - *id002
-      - *id003
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 200
       - name: q
         in: query
         required: false
@@ -1969,6 +2478,8 @@ paths:
           - partial
           - failed
           - cancelled
+      security:
+      - CookieSession: []
   /runs/{run_id}:
     get:
       operationId: getRun
@@ -2028,11 +2539,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Run'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: run_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      security:
+      - CookieSession: []
   /runs/{run_id}/events:
     get:
       operationId: streamRunEvents
@@ -2094,14 +2622,28 @@ paths:
                 type: string
           x-event-schema:
             $ref: ./trace-event.schema.json
-      description: SSE event name trace, id run_id:seq, JSON data conforming to trace-event.schema.json.
-        Cursor values must agree when both forms are supplied. Heartbeat every 15
-        seconds; closes after terminal event.
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      description: SSE event name trace, id run_id:seq, JSON data conforming to trace-event.schema.json. Cursor
+        values must agree when both forms are supplied. Heartbeat every 15 seconds; closes after terminal event.
       parameters:
       - name: run_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       - name: after_seq
         in: query
         required: false
@@ -2116,6 +2658,8 @@ paths:
           type: string
           minLength: 1
           maxLength: 200
+      security:
+      - CookieSession: []
   /runs/{run_id}/cancel:
     post:
       operationId: cancelRun
@@ -2175,11 +2719,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CancelResult'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: run_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      security:
+      - CookieSession: []
   /runs/{run_id}/lanes/{lane_id}/cancel:
     post:
       operationId: cancelLane
@@ -2239,15 +2800,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CancelResult'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: run_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       - name: lane_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      security:
+      - CookieSession: []
   /runs/{run_id}/lanes/{lane_id}/evidence:
     get:
       operationId: getLaneEvidence
@@ -2307,15 +2888,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EvidenceList'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: run_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       - name: lane_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      security:
+      - CookieSession: []
   /runs/{run_id}/lanes/{lane_id}/feedback:
     put:
       operationId: saveFeedback
@@ -2375,21 +2976,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Feedback'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: run_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       - name: lane_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/Feedback'
+      security:
+      - CookieSession: []
   /runs/{run_id}/preference:
     put:
       operationId: savePreference
@@ -2449,17 +3070,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Preference'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: run_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/Preference'
+      security:
+      - CookieSession: []
   /runs/{run_id}/lanes/{lane_id}/exports:
     post:
       operationId: createExport
@@ -2519,15 +3157,33 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Export'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: run_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       - name: lane_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       - name: Idempotency-Key
         in: header
         required: true
@@ -2542,6 +3198,8 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/ExportRequest'
+      security:
+      - CookieSession: []
   /exports/{export_id}:
     get:
       operationId: getExport
@@ -2601,11 +3259,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Export'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: export_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      security:
+      - CookieSession: []
   /exports/{export_id}/download:
     get:
       operationId: downloadExport
@@ -2666,11 +3341,28 @@ paths:
               schema:
                 type: string
                 format: binary
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: export_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      security:
+      - CookieSession: []
   /system/capabilities:
     get:
       operationId: getCapabilities
@@ -2746,6 +3438,20 @@ paths:
                 - items
                 - mode
                 additionalProperties: false
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - CookieSession: []
   /system/profiles:
     get:
       operationId: getProfiles
@@ -2814,6 +3520,20 @@ paths:
                 required:
                 - items
                 additionalProperties: false
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - CookieSession: []
   /jobs/{job_id}:
     get:
       operationId: getJob
@@ -2873,11 +3593,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Job'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       parameters:
       - name: job_id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      security:
+      - CookieSession: []
   /system/readiness:
     get:
       operationId: getReadiness
@@ -2938,6 +3675,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Health'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - CookieSession: []
   /jobs/{job_id}/cancel:
     post:
       operationId: cancelJob
@@ -2946,7 +3697,7 @@ paths:
       - name: job_id
         in: path
         required: true
-        schema: &id004
+        schema:
           type: string
           minLength: 1
           maxLength: 128
@@ -3005,6 +3756,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Job'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - CookieSession: []
   /connections/{connection_id}/preview:
     post:
       operationId: previewPostgres
@@ -3013,7 +3778,10 @@ paths:
       - name: connection_id
         in: path
         required: true
-        schema: *id004
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       responses:
         '403':
           description: Cross-origin request denied
@@ -3069,12 +3837,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PostgresPreview'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/CapturePostgres'
+      security:
+      - CookieSession: []
   /runs/{run_id}/lanes/{lane_id}/artifacts/{artifact_id}:
     get:
       operationId: getTraceArtifact
@@ -3083,15 +3865,24 @@ paths:
       - name: run_id
         in: path
         required: true
-        schema: *id004
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       - name: lane_id
         in: path
         required: true
-        schema: *id004
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       - name: artifact_id
         in: path
         required: true
-        schema: *id004
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
       responses:
         '403':
           description: Cross-origin request denied
@@ -3147,6 +3938,626 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TraceArtifact'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - CookieSession: []
+  /auth/me:
+    get:
+      operationId: getAuthMe
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentAccount'
+        '400':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /auth/register:
+    post:
+      operationId: postAuthRegister
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountRecovery'
+        '400':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterAccount'
+      security: []
+  /auth/login:
+    post:
+      operationId: postAuthLogin
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountSession'
+        '400':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginAccount'
+      security: []
+  /auth/recover:
+    post:
+      operationId: postAuthRecover
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountRecovery'
+        '400':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecoverAccount'
+      security: []
+  /auth/password:
+    post:
+      operationId: postAuthPassword
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountSession'
+        '400':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePassword'
+      security:
+      - CookieSession: []
+  /auth/logout:
+    post:
+      operationId: postAuthLogout
+      responses:
+        '204':
+          description: Success
+        '400':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - CookieSession: []
+  /me/openai-key:
+    get:
+      operationId: getMeOpenaiKey
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenAIKeyStatus'
+        '400':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - CookieSession: []
+    put:
+      operationId: putMeOpenaiKey
+      responses:
+        '204':
+          description: Success
+        '400':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveOpenAIKey'
+      security:
+      - CookieSession: []
+    delete:
+      operationId: deleteMeOpenaiKey
+      responses:
+        '204':
+          description: Success
+        '400':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Request rejected; see structured error code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - CookieSession: []
 components:
   schemas:
     Error:
@@ -3160,13 +4571,15 @@ components:
           type: string
           minLength: 1
           maxLength: 2000
-        retryable: &id006
+        retryable:
           type: boolean
         details:
           type: object
         request_id:
           anyOf:
-          - *id001
+          - type: string
+            minLength: 1
+            maxLength: 128
           - type: 'null'
       required:
       - code
@@ -3186,15 +4599,20 @@ components:
     Project:
       type: object
       properties:
-        id: *id001
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
         name:
           type: string
           minLength: 1
           maxLength: 120
-        created_at: &id005
+        created_at:
           type: string
           format: date-time
-        updated_at: *id005
+        updated_at:
+          type: string
+          format: date-time
       required:
       - id
       - name
@@ -3214,8 +4632,14 @@ components:
     Job:
       type: object
       properties:
-        id: *id001
-        project_id: *id001
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        project_id:
+          type: string
+          minLength: 1
+          maxLength: 128
         kind:
           type: string
           enum:
@@ -3224,7 +4648,10 @@ components:
           - compare_run
           - export_lane
           - delete_source
-        resource_id: *id001
+        resource_id:
+          type: string
+          minLength: 1
+          maxLength: 128
         status:
           type: string
           enum:
@@ -3233,14 +4660,18 @@ components:
           - succeeded
           - failed
           - cancelled
-        created_at: *id005
+        created_at:
+          type: string
+          format: date-time
         started_at:
           anyOf:
-          - *id005
+          - type: string
+            format: date-time
           - type: 'null'
         completed_at:
           anyOf:
-          - *id005
+          - type: string
+            format: date-time
           - type: 'null'
         progress:
           type: object
@@ -3263,8 +4694,14 @@ components:
     Source:
       type: object
       properties:
-        id: *id001
-        project_id: *id001
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        project_id:
+          type: string
+          minLength: 1
+          maxLength: 128
         kind:
           type: string
           enum:
@@ -3284,8 +4721,7 @@ components:
           - deleted
         content_sha256:
           anyOf:
-          - &id007
-            type: string
+          - type: string
             pattern: ^[a-f0-9]{64}$
           - type: 'null'
         size_bytes:
@@ -3297,9 +4733,13 @@ components:
           type: object
         job_id:
           anyOf:
-          - *id001
+          - type: string
+            minLength: 1
+            maxLength: 128
           - type: 'null'
-        created_at: *id005
+        created_at:
+          type: string
+          format: date-time
         error:
           anyOf:
           - $ref: '#/components/schemas/Error'
@@ -3320,7 +4760,10 @@ components:
     SourcePreview:
       type: object
       properties:
-        source_id: *id001
+        source_id:
+          type: string
+          minLength: 1
+          maxLength: 128
         content:
           type: string
           minLength: 0
@@ -3391,7 +4834,8 @@ components:
           - relation
           - record_key
           additionalProperties: false
-        truncated: *id006
+        truncated:
+          type: boolean
       required:
       - source_id
       - content
@@ -3401,7 +4845,10 @@ components:
     SourceImpact:
       type: object
       properties:
-        source_id: *id001
+        source_id:
+          type: string
+          minLength: 1
+          maxLength: 128
         corpus_count:
           type: integer
           minimum: 0
@@ -3416,7 +4863,10 @@ components:
           minimum: 0
         active_job_ids:
           type: array
-          items: *id001
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
           minItems: 0
       required:
       - source_id
@@ -3442,8 +4892,14 @@ components:
     PublicConnection:
       type: object
       properties:
-        id: *id001
-        project_id: *id001
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        project_id:
+          type: string
+          minLength: 1
+          maxLength: 128
         name:
           type: string
           minLength: 1
@@ -3480,7 +4936,9 @@ components:
             maxLength: 200
           minItems: 1
           maxItems: 20
-        created_at: *id005
+        created_at:
+          type: string
+          format: date-time
       required:
       - id
       - project_id
@@ -3575,8 +5033,10 @@ components:
                 type: string
                 minLength: 1
                 maxLength: 200
-              nullable: *id006
-              selectable: *id006
+              nullable:
+                type: boolean
+              selectable:
+                type: boolean
             required:
             - name
             - data_type
@@ -3601,7 +5061,10 @@ components:
     CapturePostgres:
       type: object
       properties:
-        connection_id: *id001
+        connection_id:
+          type: string
+          minLength: 1
+          maxLength: 128
         schema:
           type: string
           minLength: 1
@@ -3655,9 +5118,12 @@ components:
       properties:
         source_ids:
           type: array
-          items: *id001
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
           minItems: 1
-          maxItems: &corpusSourceLimit 50
+          maxItems: 50
           uniqueItems: true
       required:
       - source_ids
@@ -3665,20 +5131,33 @@ components:
     Corpus:
       type: object
       properties:
-        id: *id001
-        project_id: *id001
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        project_id:
+          type: string
+          minLength: 1
+          maxLength: 128
         ordinal:
           type: integer
           minimum: 1
         source_ids:
           type: array
-          items: *id001
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
           minItems: 1
-          maxItems: *corpusSourceLimit
-        content_fingerprint: *id007
+          maxItems: 50
+        content_fingerprint:
+          type: string
+          pattern: ^[a-f0-9]{64}$
         status:
           const: ready
-        created_at: *id005
+        created_at:
+          type: string
+          format: date-time
       required:
       - id
       - project_id
@@ -3697,7 +5176,9 @@ components:
           maxLength: 120
         based_on_config_id:
           anyOf:
-          - *id001
+          - type: string
+            minLength: 1
+            maxLength: 128
           - type: 'null'
         config:
           $ref: ./pipeline.schema.json
@@ -3708,9 +5189,18 @@ components:
     Configuration:
       type: object
       properties:
-        id: *id001
-        family_id: *id001
-        project_id: *id001
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        family_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        project_id:
+          type: string
+          minLength: 1
+          maxLength: 128
         name:
           type: string
           minLength: 1
@@ -3720,8 +5210,12 @@ components:
           minimum: 1
         config:
           $ref: ./pipeline.schema.json
-        config_sha256: *id007
-        created_at: *id005
+        config_sha256:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+        created_at:
+          type: string
+          format: date-time
       required:
       - id
       - family_id
@@ -3735,8 +5229,14 @@ components:
     PrepareRequest:
       type: object
       properties:
-        corpus_version_id: *id001
-        config_id: *id001
+        corpus_version_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        config_id:
+          type: string
+          minLength: 1
+          maxLength: 128
       required:
       - corpus_version_id
       - config_id
@@ -3744,10 +5244,22 @@ components:
     IndexBundle:
       type: object
       properties:
-        id: *id001
-        project_id: *id001
-        corpus_version_id: *id001
-        config_id: *id001
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        project_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        corpus_version_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        config_id:
+          type: string
+          minLength: 1
+          maxLength: 128
         status:
           type: string
           enum:
@@ -3757,15 +5269,20 @@ components:
           - failed
         job_id:
           anyOf:
-          - *id001
+          - type: string
+            minLength: 1
+            maxLength: 128
           - type: 'null'
-        requirements_sha256: *id007
+        requirements_sha256:
+          type: string
+          pattern: ^[a-f0-9]{64}$
         preparation_ms:
           anyOf:
           - type: number
             minimum: 0
           - type: 'null'
-        preparation_reused: *id006
+        preparation_reused:
+          type: boolean
         warnings:
           type: array
           items:
@@ -3793,7 +5310,10 @@ components:
     CreateRun:
       type: object
       properties:
-        corpus_version_id: *id001
+        corpus_version_id:
+          type: string
+          minLength: 1
+          maxLength: 128
         question:
           type: string
           minLength: 1
@@ -3803,8 +5323,14 @@ components:
           items:
             type: object
             properties:
-              config_id: *id001
-              bundle_id: *id001
+              config_id:
+                type: string
+                minLength: 1
+                maxLength: 128
+              bundle_id:
+                type: string
+                minLength: 1
+                maxLength: 128
             required:
             - config_id
             - bundle_id
@@ -3813,7 +5339,9 @@ components:
           maxItems: 6
         parent_run_id:
           anyOf:
-          - *id001
+          - type: string
+            minLength: 1
+            maxLength: 128
           - type: 'null'
       required:
       - corpus_version_id
@@ -3831,22 +5359,29 @@ components:
           type: string
           minLength: 1
           maxLength: 200
-        prompt_sha256: *id007
+        prompt_sha256:
+          type: string
+          pattern: ^[a-f0-9]{64}$
         profile_fingerprints:
           type: object
           properties:
-            generation: *id007
+            generation:
+              type: string
+              pattern: ^[a-f0-9]{64}$
             embedding:
               anyOf:
-              - *id007
+              - type: string
+                pattern: ^[a-f0-9]{64}$
               - type: 'null'
             tree_indexing:
               anyOf:
-              - *id007
+              - type: string
+                pattern: ^[a-f0-9]{64}$
               - type: 'null'
             tree_selection:
               anyOf:
-              - *id007
+              - type: string
+                pattern: ^[a-f0-9]{64}$
               - type: 'null'
           required:
           - generation
@@ -3899,7 +5434,10 @@ components:
           items:
             type: object
             properties:
-              source_id: *id001
+              source_id:
+                type: string
+                minLength: 1
+                maxLength: 128
               parser:
                 type: string
                 minLength: 1
@@ -3914,10 +5452,13 @@ components:
             - revision
             additionalProperties: false
           minItems: 1
-          maxItems: *corpusSourceLimit
+          maxItems: 50
         artifact_ids:
           type: array
-          items: *id001
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
           minItems: 1
           maxItems: 100
         cache_state:
@@ -3939,16 +5480,25 @@ components:
     Lane:
       type: object
       properties:
-        id: *id001
-        config_id: *id001
-        bundle_id: *id001
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        config_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        bundle_id:
+          type: string
+          minLength: 1
+          maxLength: 128
         config_snapshot:
           $ref: ./pipeline.schema.json
         provenance:
           $ref: '#/components/schemas/Provenance'
         technique:
           type: string
-          enum: &id008
+          enum:
           - bm25
           - dense
           - hybrid
@@ -4010,19 +5560,33 @@ components:
     Run:
       type: object
       properties:
-        id: *id001
-        project_id: *id001
-        corpus_version_id: *id001
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        project_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        corpus_version_id:
+          type: string
+          minLength: 1
+          maxLength: 128
         mode:
           type: string
-          enum: [live, fixture, test]
+          enum:
+          - live
+          - fixture
+          - test
         question:
           type: string
           minLength: 1
           maxLength: 8000
         parent_run_id:
           anyOf:
-          - *id001
+          - type: string
+            minLength: 1
+            maxLength: 128
           - type: 'null'
         status:
           type: string
@@ -4033,14 +5597,18 @@ components:
           - partial
           - failed
           - cancelled
-        created_at: *id005
+        created_at:
+          type: string
+          format: date-time
         started_at:
           anyOf:
-          - *id005
+          - type: string
+            format: date-time
           - type: 'null'
         completed_at:
           anyOf:
-          - *id005
+          - type: string
+            format: date-time
           - type: 'null'
         last_seq:
           type: integer
@@ -4076,12 +5644,18 @@ components:
     CancelResult:
       type: object
       properties:
-        run_id: *id001
+        run_id:
+          type: string
+          minLength: 1
+          maxLength: 128
         lane_id:
           anyOf:
-          - *id001
+          - type: string
+            minLength: 1
+            maxLength: 128
           - type: 'null'
-        cancel_requested: *id006
+        cancel_requested:
+          type: boolean
       required:
       - run_id
       - lane_id
@@ -4090,8 +5664,14 @@ components:
     EvidenceList:
       type: object
       properties:
-        run_id: *id001
-        lane_id: *id001
+        run_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        lane_id:
+          type: string
+          minLength: 1
+          maxLength: 128
         evidence:
           type: array
           items:
@@ -4125,11 +5705,16 @@ components:
       properties:
         preferred_lane_id:
           anyOf:
-          - *id001
+          - type: string
+            minLength: 1
+            maxLength: 128
           - type: 'null'
         tied_lane_ids:
           type: array
-          items: *id001
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
           minItems: 0
           maxItems: 6
           uniqueItems: true
@@ -4161,10 +5746,22 @@ components:
     Export:
       type: object
       properties:
-        id: *id001
-        project_id: *id001
-        run_id: *id001
-        lane_id: *id001
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        project_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        run_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        lane_id:
+          type: string
+          minLength: 1
+          maxLength: 128
         status:
           type: string
           enum:
@@ -4172,10 +5769,13 @@ components:
           - building
           - ready
           - failed
-        include_data: *id006
+        include_data:
+          type: boolean
         job_id:
           anyOf:
-          - *id001
+          - type: string
+            minLength: 1
+            maxLength: 128
           - type: 'null'
         manifest:
           anyOf:
@@ -4208,7 +5808,13 @@ components:
       properties:
         technique:
           type: string
-          enum: *id008
+          enum:
+          - bm25
+          - dense
+          - hybrid
+          - hybrid_rerank
+          - parent_child
+          - pageindex
         display_name:
           type: string
           minLength: 1
@@ -4217,7 +5823,8 @@ components:
           type: string
           minLength: 1
           maxLength: 2000
-        available: *id006
+        available:
+          type: boolean
         unavailable_reason:
           anyOf:
           - type: string
@@ -4234,7 +5841,8 @@ components:
             - text
             - postgres
           minItems: 0
-        export_supported: *id006
+        export_supported:
+          type: boolean
         default_config:
           anyOf:
           - $ref: ./pipeline.schema.json
@@ -4256,7 +5864,10 @@ components:
     Profile:
       type: object
       properties:
-        id: *id001
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
         label:
           type: string
           minLength: 1
@@ -4279,7 +5890,8 @@ components:
             - tree_indexing
             - reranking
           minItems: 1
-        available: *id006
+        available:
+          type: boolean
         unavailable_reason:
           anyOf:
           - type: string
@@ -4331,8 +5943,14 @@ components:
     JobAccepted:
       type: object
       properties:
-        job_id: *id001
-        resource_id: *id001
+        job_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        resource_id:
+          type: string
+          minLength: 1
+          maxLength: 128
       required:
       - job_id
       - resource_id
@@ -4367,7 +5985,10 @@ components:
     TraceArtifact:
       type: object
       properties:
-        id: *id004
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
         kind:
           const: step_details
         data:
@@ -4377,3 +5998,179 @@ components:
       - kind
       - data
       additionalProperties: false
+    PublicUser:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        username:
+          type: string
+          minLength: 3
+          maxLength: 32
+      required:
+      - id
+      - username
+    RegisterAccount:
+      type: object
+      additionalProperties: false
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 32
+        password:
+          type: string
+          minLength: 15
+          maxLength: 128
+        turnstile_token:
+          type: string
+          minLength: 1
+          maxLength: 2048
+      required:
+      - username
+      - password
+      - turnstile_token
+    LoginAccount:
+      type: object
+      additionalProperties: false
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 32
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+        turnstile_token:
+          type: string
+          minLength: 1
+          maxLength: 2048
+      required:
+      - username
+      - password
+      - turnstile_token
+    RecoverAccount:
+      type: object
+      additionalProperties: false
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 32
+        password:
+          type: string
+          minLength: 15
+          maxLength: 128
+        recovery_code:
+          type: string
+          minLength: 1
+          maxLength: 128
+        turnstile_token:
+          type: string
+          minLength: 1
+          maxLength: 2048
+      required:
+      - username
+      - password
+      - recovery_code
+      - turnstile_token
+    ChangePassword:
+      type: object
+      additionalProperties: false
+      properties:
+        current_password:
+          type: string
+          minLength: 1
+          maxLength: 128
+        password:
+          type: string
+          minLength: 15
+          maxLength: 128
+      required:
+      - current_password
+      - password
+    SaveOpenAIKey:
+      type: object
+      additionalProperties: false
+      properties:
+        api_key:
+          type: string
+          minLength: 10
+          maxLength: 512
+          pattern: ^[!-~]+$
+      required:
+      - api_key
+    OpenAIKeyStatus:
+      type: object
+      additionalProperties: false
+      properties:
+        configured:
+          type: boolean
+      required:
+      - configured
+    AccountSession:
+      type: object
+      additionalProperties: false
+      properties:
+        user:
+          $ref: '#/components/schemas/PublicUser'
+        csrf_token:
+          type: string
+          minLength: 64
+          maxLength: 64
+      required:
+      - user
+      - csrf_token
+    AccountRecovery:
+      type: object
+      additionalProperties: false
+      properties:
+        user:
+          $ref: '#/components/schemas/PublicUser'
+        csrf_token:
+          type: string
+          minLength: 64
+          maxLength: 64
+        recovery_code:
+          type: string
+          minLength: 43
+          maxLength: 43
+      required:
+      - user
+      - csrf_token
+      - recovery_code
+    CurrentAccount:
+      type: object
+      additionalProperties: false
+      properties:
+        deployment:
+          enum:
+          - local
+          - hosted
+        user:
+          anyOf:
+          - $ref: '#/components/schemas/PublicUser'
+          - type: 'null'
+        csrf_token:
+          type:
+          - string
+          - 'null'
+        turnstile_site_key:
+          type:
+          - string
+          - 'null'
+      required:
+      - deployment
+      - user
+      - csrf_token
+      - turnstile_site_key
+  securitySchemes:
+    CookieSession:
+      type: apiKey
+      in: cookie
+      name: __Host-rag-session
+      description: Required in hosted deployments. Local mode is restricted to loopback.

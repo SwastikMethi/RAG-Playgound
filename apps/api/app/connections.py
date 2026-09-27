@@ -49,7 +49,7 @@ async def create_connection(project_id: str, body: dict, request: Request):
         raise Problem(
             "RELATION_DENIED", "Configure approved relations and columns for this database before connecting."
         )
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         scoped(s, Project, project_id, lock=True)
         record = Connection(
             project_id=project_id,
@@ -65,7 +65,7 @@ async def create_connection(project_id: str, body: dict, request: Request):
 def connections(
     project_id: str, request: Request, limit: int = Query(50, ge=1, le=100), cursor: str | None = None
 ):
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         scoped(s, Project, project_id)
         query = select(Connection).where(Connection.project_id == project_id).order_by(Connection.id)
         if cursor:
@@ -80,13 +80,13 @@ def connections(
 
 @router.get("/connections/{connection_id}")
 def connection(connection_id: str, request: Request):
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         return present(s, scoped(s, Connection, connection_id))
 
 
 @router.delete("/connections/{connection_id}", status_code=204)
 def delete_connection(connection_id: str, request: Request):
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         record = scoped(s, Connection, connection_id)
         scoped(s, Project, record.project_id, lock=True)
         pending = s.scalar(
@@ -108,7 +108,7 @@ def delete_connection(connection_id: str, request: Request):
 
 
 def credentials(request, connection_id):
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         record = scoped(s, Connection, connection_id)
         return record.public_config, password(request.app.state.settings, record)
 
@@ -144,7 +144,7 @@ async def preview(connection_id: str, body: dict, request: Request):
 @router.post("/projects/{project_id}/sources/postgres", status_code=202)
 def capture_postgres(project_id: str, body: dict, request: Request):
     check_request(body, "CapturePostgres")
-    with request.app.state.store.session() as s:
+    with request.state.store.session() as s:
         scoped(s, Project, project_id, lock=True)
         record = scoped(s, Connection, body["connection_id"], project_id)
         password(request.app.state.settings, record)

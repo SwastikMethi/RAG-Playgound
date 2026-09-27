@@ -9,6 +9,11 @@ export type Lane = components["schemas"]["Lane"];
 export type Bundle = components["schemas"]["IndexBundle"];
 export type Pipeline = Configuration["config"];
 export type Job = components["schemas"]["Job"];
+let csrf: string | null = null;
+export function setCSRF(value: string | null) { csrf = value; }
+export function requireSession(response: Response) {
+  if (response.status === 401 && !["/login", "/signup", "/recover"].includes(location.pathname)) location.replace("/login");
+}
 
 export async function api<T>(
   path: string,
@@ -17,6 +22,7 @@ export async function api<T>(
   const response = await fetch("/api/v1" + path, {
     ...options,
     headers: {
+      ...(csrf && options.method && !["GET", "HEAD"].includes(options.method) ? { "X-CSRF-Token": csrf } : {}),
       ...(options.body && !(options.body instanceof FormData)
         ? { "Content-Type": "application/json" }
         : {}),
@@ -24,6 +30,7 @@ export async function api<T>(
     },
   });
   if (!response.ok) {
+    if (!path.startsWith("/auth/")) requireSession(response);
     const value = await response.json().catch(() => null);
     throw new Error(
       value?.error?.message ? `${value.error.message}${value.error.details?.field ? ` Field: ${value.error.details.field}.` : ""}` : `Request failed (${response.status}).`,
@@ -53,6 +60,7 @@ export async function apiAll<T>(path: string): Promise<{ items: T[] }> {
 
 export async function downloadFile(path: string, filename: string) {
   const response = await fetch(path);
+  requireSession(response);
   if (!response.ok) throw new Error("Download failed. Check that the file is still available.");
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");

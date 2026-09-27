@@ -2,9 +2,11 @@
 
 ## Deployment boundary
 
-Release v1 is single-owner and self-hosted. Bind published ports to loopback by default. Do not market the initial release as a hardened multi-tenant service. A later hosted release needs accounts, object-level authorization, isolation, quotas, billing controls and retention guarantees.
+Local mode is single-owner and self-hosted. Bind published ports to loopback by default. The optional hosted public beta adds accounts, object-level authorization, quotas and individual provider credentials. See [the hosted runbook](20_HOSTED_DEPLOYMENT.md) for its operating limits and backup requirements; it is not a managed enterprise service.
 
-The workspace, APIs, streaming endpoints and downloads require no application token. Access is controlled by the local deployment boundary: anyone able to reach the service can use it. Keep it on loopback; remote deployments need access control at the reverse proxy or network boundary. Use a strict Content Security Policy, sanitized Markdown and no third-party scripts handling private content.
+Local workspace APIs, streaming endpoints and downloads require no application token. Anyone able to reach the local service can use it. Public deployment must explicitly enable hosted mode: all data endpoints require a revocable session and owner-scoped lookup. Sessions use Secure, HttpOnly, SameSite cookies; writes require exact Origin and a CSRF token. Passwords use Argon2id; one-time recovery codes are hashed, rotated on use and revoke existing sessions. The public signup/login/recovery forms use Turnstile plus persistent IP/account rate limits. Turnstile scripts are limited to authentication pages, with full navigation before private content loads. Other pages retain a strict same-origin script policy and sanitized Markdown.
+
+Hosted OpenAI keys are Fernet-encrypted with the deployment master key, never returned to the browser, and loaded separately for each job owner. Hosted profiles accept only https://api.openai.com/v1; there is no environment-key fallback. Keys are omitted from exports and provider fingerprints. Removing/replacing a key affects jobs when they start; an already-running request can still incur charges. Account recovery does not recover a lost master key. Preserve a separate encrypted copy of production configuration.
 
 Run same-origin web/API and reject cross-origin API requests. Do not enable wildcard CORS with credentials or log authentication values supplied to upstream providers.
 

@@ -1,0 +1,15 @@
+{
+	email {$ACME_EMAIL}
+	admin off
+}
+
+{$RAG_DOMAIN} {
+	header Strict-Transport-Security "max-age=31536000"
+	request_body {
+		max_size 21MB
+	}
+	reverse_proxy api:8000 {
+		# Preserve streaming answers without buffering.
+		flush_interval -1
+	}
+}

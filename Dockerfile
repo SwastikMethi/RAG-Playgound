@@ -15,11 +15,13 @@ COPY packages ./packages
 COPY apps/api ./apps/api
 COPY workers ./workers
 COPY contracts ./contracts
-RUN uv sync --frozen --all-extras --no-dev
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --all-extras --no-dev
 COPY alembic.ini ./
 COPY migrations ./migrations
 COPY tools ./tools
 COPY config ./config
+COPY deploy/verify_restore.py ./deploy/verify_restore.py
+RUN groupadd --gid 10001 rag && useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin rag
 COPY --from=web /build/apps/web/dist ./apps/web/dist
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

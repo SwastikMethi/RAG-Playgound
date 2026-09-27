@@ -76,7 +76,7 @@ def request_cancel(store, s, run_id, lane_id=None):
 
 @router.post("/runs/{run_id}/cancel", status_code=202)
 def cancel_run(run_id: str, request: Request):
-    store = request.app.state.store
+    store = request.state.store
     with store.session() as s:
         run = request_cancel(store, s, run_id)
         return dict(run_id=run_id, lane_id=None, cancel_requested=bool(run.cancel_requested_at))
@@ -84,7 +84,7 @@ def cancel_run(run_id: str, request: Request):
 
 @router.post("/runs/{run_id}/lanes/{lane_id}/cancel", status_code=202)
 def cancel_lane(run_id: str, lane_id: str, request: Request):
-    store = request.app.state.store
+    store = request.state.store
     with store.session() as s:
         request_cancel(store, s, run_id, lane_id)
         _, lane = lane_in_run(s, run_id, lane_id)
@@ -93,7 +93,7 @@ def cancel_lane(run_id: str, lane_id: str, request: Request):
 
 @router.post("/jobs/{job_id}/cancel", status_code=202)
 def cancel_job(job_id: str, request: Request):
-    store = request.app.state.store
+    store = request.state.store
     with store.session() as s:
         job = scoped(s, Job, job_id, lock=True)
         if job.kind == "delete_source":

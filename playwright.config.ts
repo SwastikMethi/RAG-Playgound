@@ -1,6 +1,8 @@
 import { defineConfig } from "@playwright/test";
+import { delimiter, resolve } from "node:path";
 
 const environment = {
+  PYTHONPATH: [resolve("packages"), resolve("apps/api"), process.cwd()].join(delimiter),
   RAG_MODE: "fixture",
   RAG_MASTER_KEY: "dGhpcy1pcy1hLWZpeHR1cmUta2V5LWZvci10ZXN0cyE=",
   RAG_DATABASE_URL:
