@@ -85,7 +85,7 @@
         "additionalProperties": false
       },
       "minItems": 1,
-      "maxItems": 20
+      "maxItems": 50
     },
     "model_revisions": {
       "type": "object",

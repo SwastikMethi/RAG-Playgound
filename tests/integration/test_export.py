@@ -16,20 +16,25 @@ from tests.integration.test_api import client as client
 pytestmark = pytest.mark.integration
 
 
-def completed_lane(client, technique):
+def completed_lane(client, technique, source_count=1):
     from workers.main import Worker
 
     worker = Worker(client.app.state.settings)
     project = client.post("/api/v1/projects", json={"name": "Private export project"}).json()["id"]
     text = "# Private clock guide\nNEBULA-42 means clock drift. Synchronize the clock. 🪐"
-    source = client.post(
-        f"/api/v1/projects/{project}/sources/upload",
-        files={"file": ("confidential-original-name.md", text, "text/markdown")},
-    ).json()
-    asyncio.run(worker.run_resource(source["id"]))
-    corpus = client.post(
-        f"/api/v1/projects/{project}/corpus-versions", json={"source_ids": [source["id"]]}
-    ).json()
+    source_ids = []
+    for _ in range(source_count):
+        source = client.post(
+            f"/api/v1/projects/{project}/sources/upload",
+            files={"file": ("confidential-original-name.md", text, "text/markdown")},
+        ).json()
+        asyncio.run(worker.run_resource(source["id"]))
+        source_ids.append(source["id"])
+    response = client.post(
+        f"/api/v1/projects/{project}/corpus-versions", json={"source_ids": source_ids}
+    )
+    assert response.status_code == 201, response.text
+    corpus = response.json()
     capabilities = client.get("/api/v1/system/capabilities").json()["items"]
     config = next(c["default_config"] for c in capabilities if c["technique"] == technique)
     cfg = client.post(
@@ -75,6 +80,30 @@ def export_lane(client, worker, run, include_data=False):
     response = client.get(item["download_url"])
     assert response.status_code == 200
     return item, response.content
+
+
+def test_fifty_source_corpus_can_run_and_export_every_source(client):
+    worker, run, _ = completed_lane(client, "bm25", source_count=50)
+    try:
+        corpus = client.get("/api/v1/corpus-versions/" + run["corpus_version_id"]).json()
+        assert len(corpus["source_ids"]) == 50
+        assert {p["source_id"] for p in run["lanes"][0]["provenance"]["parser_revisions"]} == set(
+            corpus["source_ids"]
+        )
+        item, content = export_lane(client, worker, run)
+        assert len(item["manifest"]["source_hashes"]) == 50
+        archive = zipfile.ZipFile(io.BytesIO(content))
+        assert {s["source_id"] for s in json.loads(archive.read("source-manifest.json"))} == set(
+            corpus["source_ids"]
+        )
+        response = client.post(
+            f"/api/v1/projects/{run['project_id']}/corpus-versions",
+            json={"source_ids": [*corpus["source_ids"], "one-source-too-many"]},
+        )
+        assert response.status_code == 422
+        assert response.json()["error"]["message"] == "Select at most 50 sources per corpus (51 selected)."
+    finally:
+        worker.close()
 
 
 @pytest.mark.parametrize("technique", ["bm25", "dense", "hybrid", "hybrid_rerank", "parent_child"])

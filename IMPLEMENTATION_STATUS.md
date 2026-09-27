@@ -8,6 +8,14 @@ All six real adapters are implemented: BM25, scoped Qdrant dense retrieval, para
 
 Start with [README.md](README.md) or [operating instructions](docs/17_RUNNING_THE_APPLICATION.md). Local URL: `http://127.0.0.1:8780`; the workspace opens directly without a login or application token. Run both the API and `python -m workers.main`. Configure `OPENAI_API_KEY` in `.env`, never in `.env.example`. Private credentials already supplied on this machine were kept out of Git.
 
+## Fifty-source corpus limit — 27 September 2026
+
+The reported `source_ids` error came from the 20-source contract limit: the project had 30 ready sources and the upload flow selected new files without checking that limit. The owner approved raising the limit to 50. Updated corpus requests/responses, per-source parser provenance and export source hashes together. The source panel now displays the selected count against 50, explains how many sources to deselect when oversized and blocks invalid submission. Direct API callers receive an actionable limit/count error without exposing source IDs. Existing byte/page/text/chunk limits and PageIndex's separate 10-PDF compatibility limit remain in effect.
+
+Verified a real 50-source upload → ingestion → corpus → BM25 preparation → answer → offline export flow with all source IDs retained. The browser regression uploads 51 files, verifies the warning/disabled action, deselects one and saves all 50. Full checks: 52 Python tests passed (four dependency deprecation warnings, 134.32 s), five frontend tests, three browser journeys (48.5 s), production build, Ruff and pack validation. A final targeted browser check with screenshots also passed (16.2 s). Inspected 1440×900 and 390×844 warning/count/button states; evidence is under `.data/release/source-limit/`. No live model calls were made for this fix.
+
+Restarted the API and worker after confirming there were no queued/running local jobs; readiness returned `ok`. Existing uploads were retained. Concurrent owner edits to `config/profiles.yaml` were preserved and excluded from this change.
+
 ## Application token removal — 27 September 2026
 
 At the owner's request, removed the login/lock controls, browser token storage and request headers, API bearer checks, required token setting and token generation. Removed the obsolete setting from the local `.env` while preserving provider credentials and the encryption master key. Updated the access contract, generated client types, setup instructions and S01 acceptance gate. The playground remains bound to loopback with same-origin checks, CSP, scoped resource lookups and request limits. The separately exported standalone query service retains its own `RAG_QUERY_TOKEN`.

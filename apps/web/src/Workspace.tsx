@@ -51,6 +51,7 @@ import { PostgresSource } from "./PostgresSource";
 import { Workflow, StepInspector, LiveDuration } from "./Workflow";
 
 type View = "playground" | "sources" | "history";
+const MAX_CORPUS_SOURCES = 50;
 type Inspection =
   | { kind: "delete"; source: Source }
   | { kind: "export"; lane: Lane; runId: string }
@@ -90,6 +91,10 @@ export function Workspace({
     [configs, setConfigs] = useState<Configuration[]>([]);
   const [corpusId, setCorpusId] = useState(""),
     [selectedSources, setSelectedSources] = useState<string[]>([]);
+  const excessSources = selectedSources.length - MAX_CORPUS_SOURCES;
+  const sourceSelectionError = excessSources > 0
+    ? `Select at most ${MAX_CORPUS_SOURCES} sources per corpus. Deselect ${excessSources} source${excessSources === 1 ? "" : "s"} to continue.`
+    : "";
   const [selected, setSelected] = useState<string[]>(() =>
     JSON.parse(sessionStorage.getItem(`lanes:${project}`) || "[]"),
   );
@@ -327,6 +332,10 @@ export function Workspace({
     });
   }
   async function freezeCorpus() {
+    if (sourceSelectionError) {
+      setError(sourceSelectionError);
+      return;
+    }
     await action(async () => {
       const c = await post<Corpus>(`/projects/${project}/corpus-versions`, {
         source_ids: selectedSources,
@@ -465,7 +474,7 @@ export function Workspace({
               <Empty title="Give your questions a source">
                 <p>Add text-layer PDFs, Markdown or UTF-8 text files.</p>
                 <p className="caption">
-                  20 MiB per file · 20 sources per corpus · Scanned PDFs need a
+                  20 MiB per file · {MAX_CORPUS_SOURCES} sources per corpus · Scanned PDFs need a
                   text layer.
                 </p>
               </Empty>
@@ -519,14 +528,16 @@ export function Workspace({
                       )}
                   </div>
                 ))}
+                {sourceSelectionError && <ErrorNotice message={sourceSelectionError} />}
                 <div className="source-footer">
                   <span className="muted">
-                    {selectedSources.length} selected
+                    {selectedSources.length} / {MAX_CORPUS_SOURCES} selected
                   </span>
                   <Button
                     tone="primary"
                     disabled={
                       busy ||
+                      !!sourceSelectionError ||
                       !selectedSources.length ||
                       selectedSources.some(
                         (id) =>

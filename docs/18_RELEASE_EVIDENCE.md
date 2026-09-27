@@ -5,7 +5,7 @@ This maps [document 11](11_ACCEPTANCE_TESTS.md) to checks and inspected output. 
 | Gates | Evidence |
 | --- | --- |
 | A01–A03 | `test_runtime.py`: UTF-8/Unicode spans, physical PDF pages, corrupt/encrypted/no-text rejection; API/browser upload |
-| A04–A08 | `test_api.py`, `test_hybrid.py`: frozen scoping, revisions, reuse, unready rejection; `test_embeddings.py`: dimension/token caps |
+| A04–A08 | `test_api.py`, `test_hybrid.py`: frozen scoping, revisions, reuse, unready rejection; `test_embeddings.py`: dimension/token caps; `test_export.py`/`source-limit.spec.ts`: 50-source corpus, provenance and export, explicit rejection above 50 |
 | A09–A12 | Six-lane live report, `test_hybrid.py`, `test_api.py`, browser journeys: independent lanes, exact source inspection, insufficient evidence, feedback/linked reruns |
 | R01–R02 | Actual BM25 identifier ranking and zero-overlap filtering in `test_runtime.py` |
 | R03–R05 | Real scoped Qdrant in `test_vectors.py`; hand-calculated RRF/ties in `test_runtime.py`; actual weights in `test_reranker.py`; passage-linked rank-change inspector |

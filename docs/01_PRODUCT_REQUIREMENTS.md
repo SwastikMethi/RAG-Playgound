@@ -78,7 +78,7 @@ These are product safeguards and testing envelopes, not measured capacity claims
 
 | Item | Initial limit |
 | --- | --- |
-| Sources per corpus | 20 files or snapshot sources |
+| Sources per corpus | 50 files or snapshot sources |
 | One uploaded file | 20 MiB |
 | Total raw corpus bytes | 100 MiB |
 | Total PDF pages | 500 |

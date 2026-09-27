@@ -55,9 +55,16 @@ def validate(value, name="pipeline.schema.json", component=None):
     error = next(validator(name, component).iter_errors(value), None)
     if error:
         # Do not include the rejected value: it can contain credentials or private text.
+        message = "The request does not match its contract."
+        if (
+            component == "CreateCorpus"
+            and list(error.absolute_path) == ["source_ids"]
+            and error.validator == "maxItems"
+        ):
+            message = f"Select at most {error.validator_value} sources per corpus ({len(error.instance)} selected)."
         raise Problem(
             "VALIDATION_ERROR",
-            "The request does not match its contract.",
+            message,
             details={"field": ".".join(map(str, error.absolute_path)), "rule": error.validator},
         )
     if name == "pipeline.schema.json":

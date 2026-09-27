@@ -3657,7 +3657,7 @@ components:
           type: array
           items: *id001
           minItems: 1
-          maxItems: 20
+          maxItems: &corpusSourceLimit 50
           uniqueItems: true
       required:
       - source_ids
@@ -3674,7 +3674,7 @@ components:
           type: array
           items: *id001
           minItems: 1
-          maxItems: 20
+          maxItems: *corpusSourceLimit
         content_fingerprint: *id007
         status:
           const: ready
@@ -3914,7 +3914,7 @@ components:
             - revision
             additionalProperties: false
           minItems: 1
-          maxItems: 20
+          maxItems: *corpusSourceLimit
         artifact_ids:
           type: array
           items: *id001
