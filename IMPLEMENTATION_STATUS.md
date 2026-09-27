@@ -1,6 +1,6 @@
 # Implementation status
 
-M0–M7 are implemented on `codex/implement-rag-playground`. M8 release checks are being finalized, followed by the required independent whole-branch review. Scope: [execution plan](docs/14_EXECUTION_PLAN.md). Release gate: [document 11](docs/11_ACCEPTANCE_TESTS.md). No public deployment was performed.
+M0–M8 implementation and release checks are complete on `codex/implement-rag-playground`; independent whole-branch review is underway. Scope: [execution plan](docs/14_EXECUTION_PLAN.md). Release gate: [document 11](docs/11_ACCEPTANCE_TESTS.md). No public deployment was performed.
 
 ## Working application
 
@@ -12,7 +12,7 @@ Start with [README.md](README.md) or [operating instructions](docs/17_RUNNING_TH
 
 | Check | Result |
 | --- | --- |
-| Python unit/integration | M7 aggregate: 48 passed; M8 aggregate result recorded below after execution |
+| Python unit/integration | M8 aggregate: 49 passed, four dependency deprecation warnings, 132.43 seconds |
 | Frontend reducer/replay | `npm test`: 3 passed |
 | TypeScript/production build | Passed; main chunk warning: 631 kB, 196 kB gzip |
 | Browser journeys | 2 passed, 33.4 s including startup; real API/workers/PostgreSQL/Qdrant, explicitly synthetic model responses |
@@ -44,7 +44,7 @@ Reviewed 1440×900, 1024×768 and 390×844 with all six live lanes, plus doubled
 
 All 35 observed steps expose purpose, input, action/result and measured duration. Parallel hybrid branches join visibly; rank changes link to the recorded passage; parent expansion links children to parents; PageIndex lists selected sections/pages. No private model reasoning or unobserved internals are fabricated. Replay frames 0/70/140 reconstruct the completed answers with original timings. Previous/next/seek, 4× speed, compressed waits and keyboard citation inspection passed with no browser errors.
 
-Inspected local screenshots under `.data/release/visuals`: `six-lanes-1440.png`, `six-lanes-1024.png`, `six-lanes-390.png`, `workflow-*.png`, `pageindex-source-mobile.png`, `zoom-200.png`, `replay-start.png`, `replay-middle.png`, `replay-end.png`. Browser screenshots cover connector, export, setup and disconnected states. Machine-readable record: `.data/release/visual-review.json`. Review found and fixed saved-history setup restoration, 200% zoom overflow, initial project-selection races, missing passage identity in reranking and unclear parent-child links.
+Inspected local screenshots under `.data/release/visuals`: `six-lanes-1440.png`, `six-lanes-1024.png`, `six-lanes-390.png`, `workflow-*.png`, `pageindex-source-mobile.png`, `zoom-200.png`, `replay-start.png`, `replay-middle.png`, `replay-end.png`, `failed-desktop.png` and `cancelled-desktop.png`. Browser screenshots cover connector, export, setup and disconnected states. Machine-readable record: `.data/release/visual-review.json`. Review found and fixed saved-history setup restoration, 200% zoom overflow, initial project-selection races, missing passage identity in reranking, unclear parent-child links and misleading waiting/stop controls on terminal replay.
 
 ## Boundaries and operator setup
 
