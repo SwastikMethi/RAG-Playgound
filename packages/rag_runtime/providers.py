@@ -190,7 +190,7 @@ class Gateway:
         url = httpx.URL(profile.base_url.rstrip("/"))
         if self.transport is not None:
             return dict(url=url, headers={}, extensions={})  # Explicit isolated test transport.
-        address = await resolve_host(url.host, [url.host])
+        address = await resolve_host(url.host, url.port or (443 if url.scheme == "https" else 80), [url.host])
         return dict(
             url=url.copy_with(host=address),
             headers={"Host": url.netloc.decode()},

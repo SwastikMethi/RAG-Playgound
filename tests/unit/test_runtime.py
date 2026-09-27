@@ -151,3 +151,14 @@ def test_pdf_has_physical_pages_and_scans_are_rejected(tmp_path):
     bad.write_bytes(b"%PDF-corrupt")
     with pytest.raises(Problem):
         parse_file(bad, "pdf")
+    from pypdf import PdfWriter
+
+    writer = PdfWriter()
+    writer.add_blank_page(width=100, height=100)
+    writer.write(bad)
+    with pytest.raises(Problem, match="no text layer"):
+        parse_file(bad, "pdf")
+    writer.encrypt("fixture-password")
+    writer.write(bad)
+    with pytest.raises(Problem, match="unencrypted"):
+        parse_file(bad, "pdf")

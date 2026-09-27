@@ -308,11 +308,13 @@ export function StepInspector({
   runId,
   laneId,
   step,
+  stages,
   onEvidence,
 }: {
   runId: string;
   laneId: string;
   step?: Stage;
+  stages?: Record<string, Stage>;
   onEvidence: (e: Evidence) => void;
 }) {
   const [full, setFull] = useState<null | Record<string, unknown>>(null),
@@ -331,6 +333,7 @@ export function StepInspector({
   const candidates =
     (full?.payload as { candidates?: Evidence[] } | undefined)?.candidates ||
     step.candidates;
+  const recorded = Object.values(stages || {}).flatMap((s) => s.candidates);
   return (
     <>
       <div className="step-title">
@@ -424,12 +427,32 @@ export function StepInspector({
           ))}
         </>
       )}
+      {step.name === "parent_expansion" && candidates.some((c) => c.child_ids?.length) && (
+        <>
+          <h3 className="spaced">Matched child passages</h3>
+          {candidates.map((parent) => (
+            <div key={parent.candidate_id}>
+              <p>Parent #{parent.rank} · {parent.source_name} expands {parent.child_ids?.length || 0} matched passages:</p>
+              <ul className="candidate-list">
+                {parent.child_ids?.map((id) => {
+                  const child = recorded.find((c) => c.candidate_id === id);
+                  return <li key={id}>{child ? <button onClick={() => onEvidence(child)}>
+                    <strong>Child #{child.rank} · {child.source_name}</strong>
+                    <span>{child.excerpt.slice(0, 220)}{child.excerpt.length > 220 ? "…" : ""}</span>
+                  </button> : <p className="caption">Child detail is in the semantic search step’s full recorded detail.</p>}</li>;
+                })}
+              </ul>
+            </div>
+          ))}
+        </>
+      )}
       {Array.isArray(step.details.changes) && (
         <>
           <h3 className="spaced">Rank changes</h3>
           <table className="rank-table">
             <thead>
               <tr>
+                <th>Passage</th>
                 <th>Before</th>
                 <th>After</th>
                 <th>Score</th>
@@ -438,17 +461,20 @@ export function StepInspector({
             <tbody>
               {(
                 step.details.changes as {
+                  candidate_id: string;
                   before_rank: number;
                   after_rank: number;
                   score: number;
                 }[]
-              ).map((c, i) => (
-                <tr key={i}>
+              ).map((c) => {
+                const passage = recorded.find((p) => p.candidate_id === c.candidate_id);
+                return <tr key={c.candidate_id}>
+                  <td>{passage ? <button onClick={() => onEvidence(passage)}>{passage.source_name} · passage #{c.before_rank}</button> : "Passage detail is in the preceding search step."}</td>
                   <td>{c.before_rank}</td>
                   <td>{c.after_rank}</td>
                   <td>{c.score.toFixed(4)}</td>
-                </tr>
-              ))}
+                </tr>;
+              })}
             </tbody>
           </table>
         </>

@@ -29,18 +29,21 @@ function App() {
   );
   useEffect(() => {
     if (!signedIn) return;
+    let active = true;
     Promise.all([
       apiAll<Project>("/projects"),
       api<{ mode: string; items: Capability[] }>("/system/capabilities"),
     ])
       .then(([p, c]) => {
-        setProjects(p.items);
-        setProject(p.items[0]?.id || "");
+        if (!active) return;
+        setProjects((prior) => [...p.items, ...prior.filter((item) => !p.items.some((saved) => saved.id === item.id))]);
+        setProject((prior) => prior || p.items[0]?.id || "");
         setMode(c.mode);
         setCapabilities(c.items);
         setError("");
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => { if (active) setError(e.message); });
+    return () => { active = false; };
   }, [signedIn]);
   async function login(e: React.FormEvent) {
     e.preventDefault();
@@ -59,7 +62,7 @@ function App() {
     const form = e.currentTarget as HTMLFormElement;
     try {
       const p = await post<Project>("/projects", { name });
-      setProjects([...projects, p]);
+      setProjects((prior) => [...prior, p]);
       setProject(p.id);
       setName("");
       form.closest("details")?.removeAttribute("open");
@@ -170,6 +173,7 @@ function App() {
             setToken("");
             signIn(false);
             setProjects([]);
+            setProject("");
           }}
         >
           <LogOut size={16} />

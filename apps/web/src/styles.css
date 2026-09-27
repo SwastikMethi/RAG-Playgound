@@ -175,6 +175,15 @@
   font-size: 13px;
   margin-bottom: 20px;
 }
+.rank-table button {
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+  padding: 0;
+}
 .rank-table td,
 .rank-table th {
   padding: 8px;
@@ -666,6 +675,7 @@ form {
 }
 .setup-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: end;
   gap: 16px;
   margin-bottom: 20px;

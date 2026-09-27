@@ -3,10 +3,13 @@ import { defineConfig } from "@playwright/test";
 const environment = {
   RAG_APP_TOKEN: "fixture-browser-token-no-real-access",
   RAG_MODE: "fixture",
+  RAG_MASTER_KEY: "dGhpcy1pcy1hLWZpeHR1cmUta2V5LWZvci10ZXN0cyE=",
   RAG_DATABASE_URL:
     "postgresql+psycopg://rag:local-development-only@127.0.0.1:6544/ragplayground_browser_test",
   RAG_ARTIFACT_ROOT: ".data/browser-artifacts",
   RAG_QDRANT_COLLECTION_PREFIX: "rag_browser_test",
+  RAG_DATABASE_HOST_ALLOWLIST: '["127.0.0.1"]',
+  RAG_DATABASE_RELATION_ALLOWLIST: '[{"host":"127.0.0.1","port":6544,"database":"ragplayground_browser_test","schema":"browser_fixture","relation":"notes","columns":["id","body"]}]',
 };
 export default defineConfig({
   testDir: "apps/web/e2e",

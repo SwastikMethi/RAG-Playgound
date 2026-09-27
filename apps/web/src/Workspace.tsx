@@ -105,7 +105,6 @@ export function Workspace({
   const [setupOpen, setSetupOpen] = useState(true);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
   const [disconnected, setDisconnected] = useState(false);
-  useEffect(() => { if (run) setSetupOpen(false); }, [run?.id]);
   const [playback, setPlayback] = useState<Playback | null>(null),
     [connected, setConnected] = useState(false),
     [mobileLane, setMobileLane] = useState(0);
@@ -202,7 +201,7 @@ export function Workspace({
     return () => {
       stale = true;
     };
-  }, [project, corpusId]);
+  }, [project, corpusId, run?.id]);
   useEffect(() => {
     const pending = Object.values(bundles).filter((b) =>
       ["queued", "preparing"].includes(b.status),
@@ -383,10 +382,20 @@ export function Workspace({
         },
         true,
       );
-      setRun(result);
-      setMobileLane(0);
-      setInspection(null);
+      openRun(result);
     });
+  }
+  function openRun(next: Run) {
+    sessionStorage.setItem(`bundles:${project}:${next.corpus_version_id}`, JSON.stringify(
+      Object.fromEntries(next.lanes.map((lane) => [lane.config_id, lane.bundle_id])),
+    ));
+    setCorpusId(next.corpus_version_id);
+    setSelected(next.lanes.map((lane) => lane.config_id));
+    setQuestion(next.question);
+    setSetupOpen(false);
+    setMobileLane(0);
+    setInspection(null);
+    setRun(next);
   }
   async function seek(seq: number) {
     if (!run) return;
@@ -560,7 +569,7 @@ export function Workspace({
                   <button
                     key={item.id}
                     onClick={() => {
-                      setRun(item);
+                      openRun(item);
                       onView("playground");
                     }}
                   >
@@ -1044,7 +1053,7 @@ export function Workspace({
                             <Button
                               onClick={() =>
                                 action(async () => {
-                                  setRun(
+                                  openRun(
                                     await post<Run>(
                                       `/projects/${project}/runs`,
                                       {
@@ -1197,6 +1206,7 @@ export function Workspace({
             <StepInspector
               runId={run.id}
               laneId={inspection.laneId}
+              stages={playback?.lanes[inspection.laneId]?.stages}
               step={
                 playback?.lanes[inspection.laneId]?.stages[inspection.spanId]
               }

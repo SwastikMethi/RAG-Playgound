@@ -1,65 +1,57 @@
 # Implementation status
 
-Implementation is in progress on `codex/implement-rag-playground`. The approved scope is [the execution plan](docs/14_EXECUTION_PLAN.md); [document 11](docs/11_ACCEPTANCE_TESTS.md) is the release gate.
+M0–M7 are implemented on `codex/implement-rag-playground`. M8 release checks are being finalized, followed by the required independent whole-branch review. Scope: [execution plan](docs/14_EXECUTION_PLAN.md). Release gate: [document 11](docs/11_ACCEPTANCE_TESTS.md). No public deployment was performed.
 
-| Milestone | State | Evidence |
-| --- | --- | --- |
-| M0 foundations | Verified foundation | 44 API contracts; four foundation/auth/revision tests; frontend production build |
-| M1 BM25 slice | Verified functional slice | 12 Python checks, reducer check, production build and browser upload → prepare → answer → citation → replay journey pass |
-| M2 dense/hybrid/rerank | Verified functional adapters | 17 Python checks pass, including real Qdrant isolation, cross-encoder inference, parallel wall timing, preparation reuse and failure isolation |
-| M3 traces/recovery | Verified event and recovery path | 25 Python checks, 3 frontend checks; fixed workflow graphs and step inspector; persisted replay, Unicode/citation integrity, cancellation, deadlines and worker fencing |
-| M4 hierarchy/PageIndex | Implemented; live models pending | Real parent-child vector path; PageIndex 0.2.19 PDF indexing, tree/page APIs, bounded selection and end-to-end worker tested with synthetic model boundaries |
-| M5 PostgreSQL source | Implemented and integration checked | Encrypted credentials, exact host/relation/column policy, read-only repeatable-read snapshots, stable keys, preview, refresh and row evidence; three real PostgreSQL integration tests |
-| M6 export | Implemented and replay checked | Shared runtime/preparation, all six adapter exports, PostgreSQL snapshots, no-data privacy, copied-runtime replay, standalone CLI/API, protected ZIP download |
-| M7 product completion | Implemented and journey checked | Feedback/preferences, history/reruns, configuration revisions, diagnostics, confirmed retryable deletion, security hardening, responsive/keyboard UI and local/container setup |
-| M8 release verification | Pending | |
+## Working application
 
-## Verified before implementation
+All six real adapters are implemented: BM25, scoped Qdrant dense retrieval, parallel hybrid RRF, hybrid with a pinned local cross-encoder, parent-child and experimental PageIndex. The application includes file ingestion, frozen PostgreSQL text snapshots, immutable corpus/configuration revisions, preparation reuse, independent streamed answers and citations, measured execution graphs, persisted replay, source inspection, manual feedback, history, reruns, confirmed retryable deletion and standalone export using the same runtime.
 
-All 16 original implementation documents, six configuration examples, 45 trace examples and 40 API operations passed pack/schema checks using the supported OpenAPI validator entry point in a temporary in-memory probe. The original validator fails with openapi-spec-validator 0.9.0 because its deprecated shortcut ignores the supplied reference base URI.
+Start with [README.md](README.md) or [operating instructions](docs/17_RUNNING_THE_APPLICATION.md). Local URL: `http://127.0.0.1:8780`; unlock using `RAG_APP_TOKEN` from your ignored `.env`. Run both the API and `python -m workers.main`. Configure `OPENAI_API_KEY` in `.env`, never in `.env.example`. Private credentials already supplied on this machine were kept out of Git.
 
-## Decisions
+## Checks actually run — 27 September 2026
 
-- The user selected the standard OpenAI API endpoint. Server profiles use GPT-4.1 mini (2025-04-14 snapshot) and text-embedding-3-small (1,536 dimensions). The supplied OPENAI_API_KEY is stored only in the ignored local .env; live calls remain to be verified.
-- This was a new directory with no Git history or unrelated application changes; implementation uses a dedicated initial branch in place.
-- PostgreSQL owns jobs and event recovery; no Redis or extra broker.
-- Fixture preview is explicit and separate from live projects.
+| Check | Result |
+| --- | --- |
+| Python unit/integration | M7 aggregate: 48 passed; M8 aggregate result recorded below after execution |
+| Frontend reducer/replay | `npm test`: 3 passed |
+| TypeScript/production build | Passed; main chunk warning: 631 kB, 196 kB gzip |
+| Browser journeys | 2 passed, 33.4 s including startup; real API/workers/PostgreSQL/Qdrant, explicitly synthetic model responses |
+| Pack validator | Passed: 44 API operations, six configurations, 45 example events; separate from application checks |
+| Ruff | Passed |
+| Linux/Node 22 image | Builds; API, Docling, PageIndex and PyTorch `2.11.0+cpu` imports passed; final image freshness recorded below |
+| Actual reranker | CPU safetensors inference with `cross-encoder/ms-marco-MiniLM-L6-v2@233902d25c440f23af6f7d6e94d2946bac0bee0a` passed |
+| Live OpenAI | All six lanes, live embeddings, streamed generation, actual PageIndex SDK indexing/navigation, usage and cancellation passed |
+| Export | All six adapters offline-replayed; dense and PageIndex exports additionally live-replayed successfully |
+| Fresh standalone package | 165 locked dependencies installed in a separate environment; verify, PDF re-ingestion, live CLI query, HTTP health/auth and live HTTP query passed |
 
-## Verification still required
+Python tests exercise real BM25, Docling, Qdrant, PostgreSQL, reranker weights and PageIndex SDK interfaces. Deterministic model boundaries make CI reproducible; these are distinct from live results. Tests cover scopes, contracts, immutable revisions, deadlines, cancellation, lease fencing, coordinator recovery, retries, evidence spans, Unicode/hashes, preparation reuse, deletion retries, private exports, encrypted/corrupt/no-text PDF rejection, ZIP traversal and runtime symlink rejection.
 
-Release-wide checks and full rendered state coverage remain pending. Actual reranker weights and inference are verified below; live PageIndex indexing is not yet verified. No real model-provider calls have been made. PageIndex 0.2.19 public local indexing/tree/page APIs were inspected successfully; this is not a live indexing result.
+The browser journeys cover upload → prepare → answer → citation/download → workflow → replay → export/download → feedback/history/rerun → confirmed deletion. The PostgreSQL journey previews/captures selected columns, inspects frozen row evidence and removes the encrypted connection. Hostile HTML/script/image/JavaScript-link and instruction payloads remain inert and make no external requests. Five interrupted event connections expose recovery; reconnect restores saved output without another run submission. Browser workers have a separate database so they cannot claim Python-test jobs.
 
-## Recorded checks
+## Actual live integration
 
-- `.venv/bin/python -m pytest tests/unit/test_contracts.py tests/integration/test_foundations.py tests/integration/test_api.py -q`: 4 passed, using dedicated PostgreSQL test database.
-- `.venv/bin/python -m pytest tests/unit/test_runtime.py -q`: 6 passed, real BM25, tokenization and Docling PDF conversion. Model asset initialization took roughly two minutes.
-- `npm run generate:types` and `npm run build`: passed. Host Node 25 was used; supported Node 22 container validation remains pending.
-- M1 `.venv/bin/python -m pytest tests/unit tests/integration -q`: 12 passed. The evidence-list response was subsequently corrected to the authoritative contract and its journey test passed again.
-- M1 `npm test`: one reducer check passed for Unicode offsets, duplicate frames, sequence gaps and replay reconstruction.
-- M1 `npm run test:e2e`: one complete browser journey passed against the real API/worker/PostgreSQL, with an explicitly synthetic model provider.
-- Inspected `test-results/bm25-desktop.png` (1440px) and `test-results/bm25-mobile.png` (390px). Source and answer text are readable and there is no mobile horizontal overflow. This is provisional visual evidence: vertical density, mobile workspace controls, complete workflows, 1024px, keyboard and reduced-motion gates remain for M7/M8.
-- M2 actual cross-encoder inference passed using `cross-encoder/ms-marco-MiniLM-L6-v2@233902d25c440f23af6f7d6e94d2946bac0bee0a`, CPU, safetensors, offline loading. Public weights were downloaded explicitly; no private source data was sent for this setup.
-- Qdrant client and server are both pinned to 1.17.0 after a compatibility warning on the initially resolved client. Scoped read/delete checks pass without the warning.
+Authorized calls used `https://api.openai.com/v1`, `gpt-4.1-mini-2025-04-14`, and `text-embedding-3-small` (1,536 dimensions). The source was one generated text-layer PDF explicitly describing a fictional NEBULA-42 clock error. PageIndex 0.2.19 indexed the actual PDF through its SDK. No private business documents were used.
 
-- M4 PageIndex actual SDK indexing and original-page mapping passed against a local synthetic summary provider. Its internal retry ladder cannot bypass the application’s two-attempt limit; cancellation kills the owned indexing process group and removes its temporary store. This is a real SDK compatibility check, not live model verification.
-- Model settings were checked against the [OpenAI model reference](https://developers.openai.com/api/docs/models/gpt-4.1-mini) and [embedding guide](https://developers.openai.com/api/docs/guides/embeddings). The PageIndex adapter follows its [public document APIs](https://docs.pageindex.ai/sdk/documents).
+All six answers included E1 source evidence. Answers were inspected against the authored fictional recovery instructions; this does not claim human source verification. The persisted stream contained 20 ordered answer deltas. Completion times: BM25 2.20 s, dense 4.44 s, hybrid 4.55 s, reranking 9.85 s, parent-child 4.44 s, PageIndex 4.56 s. This is a small smoke, not a benchmark. Cancellation reached `cancelled`; upstream usage remained partial/unknown where unreported.
 
-## PostgreSQL snapshot verification
+Dense and PageIndex live export replay matched evidence order and answer text on this run; future stochastic answers need not match. Live export replay documents that existing verified indexes were reused. Separately, a fresh standalone dense package rebuilt its index from original PDF bytes and made new OpenAI embedding/generation calls. Its unauthenticated `/query` returned 401; authenticated query returned the expected evidence and reported token usage.
 
-Three real PostgreSQL tests pass with a dedicated column-scoped read-only role: hostile quoted identifiers, encrypted credentials, approved columns, cross-project isolation, duplicate/null key rejection, write-role rejection, row/byte caps, repeatable-read isolation and statement deadlines. Capture refresh creates a distinct source; old answers use frozen row text after database mutation and connection deletion. Two execution/network checks also pass, including metadata-address rejection. The connection UI and row inspector compile; rendered connector review remains in M7. Setup policy is documented in [operating instructions](docs/17_RUNNING_THE_APPLICATION.md).
+Private local evidence: `.data/release/live-report.json`, `.data/release/standalone-report.json`. Reproduce with `python tools/verify_live.py --allow-model-calls`, which explicitly permits new billable calls. `node tools/review_saved_run.mjs` only reads saved runs.
 
-## Export verification
+## Rendered visual/replay review
 
-The full application suite passes 41 tests (98.90 s), including six export integration tests, actual PageIndex SDK export replay and captured PostgreSQL row export. Offline replay runs the copied runtime in an owned subprocess and compares evidence IDs/order, source mapping, exact generation-context requests and answer assembly. Qdrant local exact replay uses stored embeddings; model, reranker and tree-selection responses are recorded boundaries. This does not claim remote HNSW or fresh provider performance.
+Reviewed 1440×900, 1024×768 and 390×844 with all six live lanes, plus doubled controls/text using Chromium 200% CSS zoom. Desktop has three readable columns, tablet two, mobile a lane selector. Mobile source inspection traps focus; Escape closes it and restores citation focus. Reduced motion preserves all information. Sources, comparison, history, setup and export share controls and typography with progressive detail disclosure.
 
-No-data archive scans exclude private fixture text, original file names, questions, answers and application tokens. Included-data ingestion rejects changed source hashes. A corrupted boundary recording fails the export and removes its download URL. The generated lock resolves independently and installs 165 dependencies in an isolated virtual environment; standalone ingest, query and API checks use the labeled synthetic model provider. Browser upload → prepare → answer → evidence → workflow → replay → export/download passes (11.0 s). The production frontend build passes. Inspected `test-results/export-desktop.png`; design density and checkbox alignment remain for M7. No public deployment was performed.
+All 35 observed steps expose purpose, input, action/result and measured duration. Parallel hybrid branches join visibly; rank changes link to the recorded passage; parent expansion links children to parents; PageIndex lists selected sections/pages. No private model reasoning or unobserved internals are fabricated. Replay frames 0/70/140 reconstruct the completed answers with original timings. Previous/next/seek, 4× speed, compressed waits and keyboard citation inspection passed with no browser errors.
 
-## Product completion verification
+Inspected local screenshots under `.data/release/visuals`: `six-lanes-1440.png`, `six-lanes-1024.png`, `six-lanes-390.png`, `workflow-*.png`, `pageindex-source-mobile.png`, `zoom-200.png`, `replay-start.png`, `replay-middle.png`, `replay-end.png`. Browser screenshots cover connector, export, setup and disconnected states. Machine-readable record: `.data/release/visual-review.json`. Review found and fixed saved-history setup restoration, 200% zoom overflow, initial project-selection races, missing passage identity in reranking and unclear parent-child links.
 
-M7 completed feedback and comparison notes, history filters and reruns, model/retrieval settings, source previews/downloads, explicit stream reconnection, setup diagnostics and source deletion with dependency impact, busy-work rejection, retry after storage failure and orphan-vector reconciliation. Fixture provenance stays with saved runs after changing server mode. Provider DNS pinning and request-body byte limits are checked. Collection pagination now matches the contract, including opaque stable cursors. Operational JSON logs contain IDs, stages, durations and error codes rather than content, credentials or URL query strings.
+## Boundaries and operator setup
 
-The pre-final M7 Python suite passed 45 checks after switching Linux dependencies to CPU builds; added pagination, setup and log-redaction checks subsequently passed their targeted runs. `npm test` passes all three reducer/timeline checks, `npm run build` and Ruff pass, and the pack validator passes. The expanded browser journey passes in 10.9 seconds (15.8 including startup), covering persisted feedback, history/rerun, original-source download, offline export, destructive confirmation and completed cleanup, setup readiness and mobile keyboard focus. Browser workers now have a separate `ragplayground_browser_test` database. A mobile focus regression was reproduced, then fixed by preserving Markdown renderer identity and restoring inert regions before focus.
+- OpenAI credentials and local model assets are verified on this machine. Elsewhere operators need provider credentials, a private app token and a stable encryption master key. PostgreSQL import needs approved host/relation/column policy and a read-only login. No external business database was requested or connected.
+- Offline replay controls external model boundaries and uses Qdrant local exact search. It verifies parity, not remote HNSW performance. No-data archives omit source bytes/names, questions, answers and credentials. Included-data exports include only selected frozen snapshots.
+- Linux ships CPU-only inference. GPU/CUDA, cloud deployment, load benchmarking, Safari/Firefox, screen-reader user testing and disaster recovery on an external production host were not performed. Zoom was tested through Chromium CSS zoom.
+- Cost remains unavailable without a matching price profile; usage is displayed without inventing zero charges. Dependency deprecations and the frontend chunk-size warning are non-fatal.
+- OCR, analytical text-to-SQL, live database sync, GraphRAG/RAPTOR, automatic optimization, additional connectors and multi-user SaaS are outside agreed v1. No in-scope adapter or PostgreSQL connector was deferred.
 
-The Node 22/Linux image builds successfully. Running that image confirms API, Docling and PageIndex imports and PyTorch `2.11.0+cpu` with no CUDA dependency. Operational commands, limits, credential rotation and consistent backup/restore are documented in [running the application](docs/17_RUNNING_THE_APPLICATION.md). `.env` is ignored and private; no real key is committed.
-
-Rendered M7 review: `test-results/bm25-desktop.png` (1440px), `bm25-mobile.png` and `setup-mobile.png` (390px), plus `workflow-desktop.png` and `export-desktop.png`. Preparation now collapses after submission, answers occupy the lane width, controls remain aligned and the mobile inspector traps/restores focus. Multi-lane, 1024px, reduced-motion, zoom, connector and live PageIndex review remain M8 release checks.
+See [acceptance evidence map](docs/18_RELEASE_EVIDENCE.md).
