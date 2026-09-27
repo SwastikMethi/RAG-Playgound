@@ -18,7 +18,7 @@ Start with [README.md](README.md) or [operating instructions](docs/17_RUNNING_TH
 | Browser journeys | 2 passed, 34.2 s including startup; real API/workers/PostgreSQL/Qdrant, explicitly synthetic model responses |
 | Pack validator | Passed: 44 API operations, six configurations, 45 example events; separate from application checks |
 | Ruff | Passed |
-| Linux/Node 22 image | Builds; API, Docling, PageIndex and PyTorch `2.11.0+cpu` imports passed; final image freshness recorded below |
+| Linux/Node 22 image | Final image rebuilt successfully after all review fixes; API, Docling, PageIndex and PyTorch `2.11.0+cpu` imports verified |
 | Actual reranker | CPU safetensors inference with `cross-encoder/ms-marco-MiniLM-L6-v2@233902d25c440f23af6f7d6e94d2946bac0bee0a` passed |
 | Live OpenAI | All six lanes, live embeddings, streamed generation, actual PageIndex SDK indexing/navigation, usage and cancellation passed |
 | Export | All six adapters offline-replayed; dense and PageIndex exports additionally live-replayed successfully |
@@ -45,6 +45,8 @@ Reviewed 1440×900, 1024×768 and 390×844 with all six live lanes, plus doubled
 All 35 observed steps expose purpose, input, action/result and measured duration. Parallel hybrid branches join visibly; rank changes link to the recorded passage; parent expansion links children to parents; PageIndex lists selected sections/pages. No private model reasoning or unobserved internals are fabricated. Replay frames 0/70/140 reconstruct the completed answers with original timings. Previous/next/seek, 4× speed, compressed waits and keyboard citation inspection passed with no browser errors.
 
 The final packing inspector also exposes the exact recorded token count/budget, excluded count and selected passages (`packing-desktop.png`). The app and worker are running locally; authenticated readiness and all six technique capabilities pass (`.data/release/readiness.json`).
+
+A final scan found no actual provider key, application token or encryption master key in tracked files or either live export ZIP. The local `.env` has mode 0600. Final test logs and the execution ledger are preserved in `.data/release`; the plan’s generated scratch workspace was cleaned up.
 
 Inspected local screenshots under `.data/release/visuals`: `six-lanes-1440.png`, `six-lanes-1024.png`, `six-lanes-390.png`, `workflow-*.png`, `pageindex-source-mobile.png`, `zoom-200.png`, `replay-start.png`, `replay-middle.png`, `replay-end.png`, `failed-desktop.png` and `cancelled-desktop.png`. Browser screenshots cover connector, export, setup and disconnected states. Machine-readable record: `.data/release/visual-review.json`. Review found and fixed saved-history setup restoration, 200% zoom overflow, initial project-selection races, missing passage identity in reranking, unclear parent-child links and misleading waiting/stop controls on terminal replay.
 
