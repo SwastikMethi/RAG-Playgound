@@ -6,7 +6,13 @@ M0–M8 implementation, release checks and independent whole-branch review are c
 
 All six real adapters are implemented: BM25, scoped Qdrant dense retrieval, parallel hybrid RRF, hybrid with a pinned local cross-encoder, parent-child and experimental PageIndex. The application includes file ingestion, frozen PostgreSQL text snapshots, immutable corpus/configuration revisions, preparation reuse, independent streamed answers and citations, measured execution graphs, persisted replay, source inspection, manual feedback, history, reruns, confirmed retryable deletion and standalone export using the same runtime.
 
-Start with [README.md](README.md) or [operating instructions](docs/17_RUNNING_THE_APPLICATION.md). Local URL: `http://127.0.0.1:8780`; the workspace opens directly without a login or application token. Run both the API and `python -m workers.main`. Configure `OPENAI_API_KEY` in `.env`, never in `.env.example`. Private credentials already supplied on this machine were kept out of Git.
+Start with [README.md](README.md) or [operating instructions](docs/17_RUNNING_THE_APPLICATION.md). After setup, use `./start.sh` and `./stop.sh` to manage the API, worker and local storage services. Local URL: `http://127.0.0.1:8780`; the workspace opens directly without a login or application token. Configure `OPENAI_API_KEY` in `.env`, never in `.env.example`. Private credentials already supplied on this machine were kept out of Git.
+
+## Local start and stop scripts — 27 September 2026
+
+Added executable `start.sh` and `stop.sh` with shared lifecycle logic in `tools/local_app.py`. Startup waits for Docker storage, applies migrations, builds the frontend and detaches the API/worker with private logs and process records. It checks API readiness and worker initialization before reporting success. Repeated starts reuse the existing pair; failed startup cleans up the processes it launched. Stop validates process identity, stops owned subprocesses and stops PostgreSQL/Qdrant without deleting volumes. No dependencies were added. Setup and troubleshooting instructions now use these scripts.
+
+Verified real start → repeated start → stop → repeated stop → restart, a successful homepage response and readiness `ok`. The existing 31 source records remained present after restart. The lifecycle regression uses real subprocesses and HTTP to check duplicate prevention, stale PID safety and failed-start cleanup while isolating Docker/build commands. The final Python suite passed: 53 tests, four dependency deprecation warnings, 126.58 seconds. Shell syntax, Ruff, production build and pack validation passed. No screens changed and no live provider calls were needed. Existing owner edits to `config/profiles.yaml` were preserved.
 
 ## Fifty-source corpus limit — 27 September 2026
 

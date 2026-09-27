@@ -14,15 +14,14 @@ uv run python tools/init_env.py
 Set `OPENAI_API_KEY` in the ignored `.env`. It already contains a generated encryption key for saved database credentials. The default profiles use `https://api.openai.com/v1`, `gpt-4.1-mini-2025-04-14` and `text-embedding-3-small`. Keep secrets out of `.env.example`.
 
 ```sh
-docker compose -f compose.yaml -f compose.dev.yaml up -d postgres qdrant
-uv run alembic upgrade head
 uv run python tools/prepare_models.py --reranker --pdf
 npm ci
-npm run build
-uv run uvicorn app.main:app --host 127.0.0.1 --port 8780 --no-access-log
+./start.sh
 ```
 
-In another terminal, run `uv run python -m workers.main`. Open **http://127.0.0.1:8780**; the workspace opens directly without a login or application token. Create a project, upload sources, freeze a corpus, select techniques and prepare them before asking. `RAG_MODE=fixture` on **both** processes enables a visibly labeled synthetic demonstration.
+`./start.sh` starts PostgreSQL and Qdrant, applies migrations, builds the frontend and starts the API and worker in the background. It waits for readiness before returning. Open **http://127.0.0.1:8780**; the workspace opens directly without a login or application token. Create a project, upload sources, freeze a corpus, select techniques and prepare them before asking.
+
+Run `./stop.sh` to stop the API, worker and local database services. Uploads, indexes and database volumes are preserved. Logs are in `.data/logs/api.log` and `.data/logs/worker.log`; repeat starts do not create duplicate processes. Restart after changing `.env` or profiles. `RAG_MODE=fixture ./start.sh` enables a visibly labeled synthetic demonstration on both processes.
 
 For the full container setup, PostgreSQL connection policy, backups, limits and troubleshooting, see [running the application](docs/17_RUNNING_THE_APPLICATION.md). See [implementation status](IMPLEMENTATION_STATUS.md) for checks actually performed and remaining limitations.
 
