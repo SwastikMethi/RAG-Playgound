@@ -70,6 +70,16 @@ test("upload, prepare, answer, inspect evidence and replay", async ({
   await expect(page.locator(".answer-text")).toContainText(
     "Synchronize the clock",
   );
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  await page.getByRole("button", { name: "Build export", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Download ZIP", exact: true })).toBeVisible({ timeout: 20000 });
+  await expect(page.getByRole("complementary", { name: "Export implementation" })).toContainText("live replay · Not performed");
+  await page.screenshot({ path: "test-results/export-desktop.png", fullPage: true });
+  const downloading = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download ZIP", exact: true }).click();
+  const download = await downloading;
+  expect(download.suggestedFilename()).toBe("rag-implementation.zip");
+  await page.getByRole("button", { name: "Close inspector" }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: "test-results/bm25-mobile.png",

@@ -97,6 +97,9 @@ def load_profiles(settings):
                 ),
             ]
         }
+    from dotenv import load_dotenv
+
+    load_dotenv(".env", override=False)
     path = Path(settings.profiles_path)
     data = yaml.safe_load(path.read_text()) if path.exists() else {}
     profiles = {}

@@ -260,8 +260,31 @@ async def capture(
         truncated=truncated,
         ordering=ordering,
     )
+    return dict(raw=raw, parsed=parse_snapshot(canonical(raw)))
+
+
+def parse_snapshot(data):
+    import json
+
+    try:
+        raw = json.loads(data)
+        if raw["format"] != "postgres_snapshot_v1":
+            raise ValueError()
+        if not isinstance(raw["relation"], str) or not isinstance(raw["truncated"], bool):
+            raise ValueError()
+        if not 1 <= len(raw["rows"]) <= 10000 or len(data) > 21 * 1024 * 1024:
+            raise ValueError()
+        for row in raw["rows"]:
+            if not isinstance(row["text"], str) or not isinstance(row["key"], dict):
+                raise ValueError()
+            if not row["key"] or any(v is None for v in row["key"].values()):
+                raise ValueError()
+            if row["updated_at"] is not None and not isinstance(row["updated_at"], str):
+                raise ValueError()
+    except (ValueError, KeyError, TypeError, AssertionError):
+        raise Problem("INVALID_SNAPSHOT", "The captured text snapshot is malformed.") from None
     text, segments = "", []
-    for row in rows:
+    for row in raw["rows"]:
         start = len(text)
         text += row["text"] + "\n\n"
         segments.append(
@@ -279,7 +302,7 @@ async def capture(
         segments=segments,
         parser="postgres_snapshot",
         parser_revision="1",
-        sha256=digest(canonical(raw)),
-        warnings=["Snapshot truncated in stable key order."] if truncated else [],
+        sha256=digest(data),
+        warnings=["Snapshot truncated in stable key order."] if raw["truncated"] else [],
     )
-    return dict(raw=raw, parsed=parsed)
+    return parsed

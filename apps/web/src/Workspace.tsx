@@ -26,6 +26,7 @@ import {
   type Configuration,
   type Corpus,
   type Pipeline,
+  type Lane,
   type Run,
   type Source,
 } from "./api";
@@ -40,11 +41,13 @@ import {
   type TraceEvent,
 } from "./reducer";
 import { streamEvents } from "./stream";
+import { ExportPanel } from "./ExportPanel";
 import { PostgresSource } from "./PostgresSource";
 import { Workflow, StepInspector, LiveDuration } from "./Workflow";
 
 type View = "playground" | "sources" | "history";
 type Inspection =
+  | { kind: "export"; lane: Lane; runId: string }
   | { kind: "postgres"; source?: Source }
   | { kind: "source"; source: Source }
   | { kind: "evidence"; evidence: Evidence }
@@ -878,6 +881,7 @@ export function Workspace({
                             First token{" "}
                             <strong>{ms(state?.metrics?.ttft_ms)}</strong>
                           </span>
+                          {lane.status === "completed" && <Button onClick={() => setInspection({ kind: "export", lane, runId: run.id })}>Export</Button>}
                           {config && (
                             <Button
                               aria-label={`Settings for ${config.name}`}
@@ -1096,7 +1100,7 @@ export function Workspace({
       {inspection && (
         <Inspector
           title={
-            inspection.kind === "postgres"
+            inspection.kind === "export" ? "Export implementation" : inspection.kind === "postgres"
               ? "PostgreSQL snapshot"
               : inspection.kind === "step"
                 ? "Execution step"
@@ -1108,7 +1112,7 @@ export function Workspace({
           }
           onClose={closeInspector}
         >
-          {inspection.kind === "postgres" ? (
+          {inspection.kind === "export" ? <ExportPanel key={inspection.lane.id} runId={inspection.runId} lane={inspection.lane} /> : inspection.kind === "postgres" ? (
             <PostgresSource
               project={project}
               initial={inspection.source}
@@ -1182,7 +1186,7 @@ export function Workspace({
 function SourceInspector({
   inspection,
 }: {
-  inspection: Exclude<Inspection, { kind: "settings" | "step" }>;
+  inspection: Extract<Inspection, { kind: "source" | "evidence" }>;
 }) {
   const [preview, setPreview] = useState(""),
     [error, setError] = useState("");

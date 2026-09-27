@@ -18,6 +18,7 @@ from .content import router as content_router
 from .runs import router as runs_router
 from .cancellation import router as cancellation_router
 from .connections import router as connections_router
+from .exports import router as exports_router
 from .models import Configuration, Project
 from .present import present
 from .settings import Settings
@@ -189,6 +190,7 @@ def create_app(settings=None):
     app.include_router(runs_router)
     app.include_router(cancellation_router)
     app.include_router(connections_router)
+    app.include_router(exports_router)
     app.mount(
         "/",
         StaticFiles(

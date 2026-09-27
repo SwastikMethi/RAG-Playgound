@@ -4,7 +4,6 @@ import asyncio
 import json
 import time
 from collections import OrderedDict
-from importlib.metadata import version
 
 from sqlalchemy import select
 
@@ -26,7 +25,7 @@ from app.models import (
 )
 from app.settings import Settings
 from app.runs import TERMINAL
-from rag_runtime.chunking import chunk_source, parent_child_chunks
+from rag_runtime.preparation import prepare_sources
 from rag_runtime.contracts import canonical, digest
 from rag_runtime.errors import Problem
 from rag_runtime.providers import Gateway, empty_usage, load_profiles
@@ -214,6 +213,7 @@ class Worker:
             "ingest_source": self.ingest,
             "prepare_index": self.prepare,
             "compare_run": self.compare,
+            "export_lane": self.export,
         }.get(claim["kind"])
         if handler is None:
             raise Problem("UNKNOWN_JOB", "This worker does not support the job type.")
@@ -249,8 +249,10 @@ class Worker:
                 job.completed_at, job.error = self.store.now(s), error.public() if error else None
                 if error and claim["kind"] == "compare_run":
                     self.fail_run(s, job, error.public())
-                if error and claim["kind"] in {"ingest_source", "prepare_index"}:
-                    model = Source if claim["kind"] == "ingest_source" else IndexBundle
+                if error and claim["kind"] in {"ingest_source", "prepare_index", "export_lane"}:
+                    model = {"ingest_source": Source, "prepare_index": IndexBundle, "export_lane": Export}[
+                        claim["kind"]
+                    ]
                     resource = scoped(s, model, claim["resource_id"], claim["project_id"])
                     resource.status, resource.error = "failed", error.public()
         except Problem as exc:
@@ -339,6 +341,11 @@ class Worker:
                 },
             )
 
+    async def export(self, claim):
+        from .export import export_lane
+
+        await export_lane(self, claim)
+
     async def prepare(self, claim):
         began = time.monotonic()
         with self.store.session() as s:
@@ -390,69 +397,29 @@ class Worker:
             if config["embedding"]:
                 job = s.get(Job, claim["id"])
                 job.progress = dict(vector_scope=scope, vector_dimensions=config["embedding"]["dimensions"])
-        chunks, parents = [], []
-        for source in sources:
-            if config["tree"]:
-                continue
-            if config["parent"]:
-                children, expanded = parent_child_chunks(
-                    source, config["chunking"], config["parent"]["max_parent_tokens"]
-                )
-                chunks.extend(children)
-                parents.extend(expanded)
-            else:
-                chunks.extend(chunk_source(source, config["chunking"]))
-        if (not chunks and not config["tree"]) or len(chunks) > 10_000:
-            raise Problem("CHUNK_LIMIT", "Preparation requires 1–10,000 chunks.")
-        prepared = dict(
-            chunks=chunks,
-            parents=parents,
-            scope=scope,
-            format_version="1",
-            recordings=[],
-            versions=dict(bm25=version("rank-bm25"), lexical="lexical_v1", tokenizer=version("tiktoken")),
-        )
+        raw_paths = {}
         if config["tree"]:
-            from rag_runtime.pageindex_build import build_document
-
-            documents = []
-            for source in sources:
-                with self.store.session() as s:
-                    self.store.owned(s, claim["id"], claim["owner_token"])
-                    src = scoped(s, Source, source["source_id"], claim["project_id"])
-                    raw = scoped(s, Artifact, src.raw_artifact_id, claim["project_id"])
-                    path = self.store.path(raw)
-                document = await build_document(
-                    path,
-                    source,
-                    self.profiles[config["tree"]["index_profile_id"]],
-                    self.gateway,
-                    root=self.store.root,
-                )
-                prepared["recordings"].extend(document.pop("recordings"))
-                documents.append(document)
-            prepared["documents"] = documents
-            prepared["versions"]["pageindex"] = config["tree"]["sdk_version"]
-            prepared["preprocessing"] = (
-                "PageIndex SDK builds the tree from the original PDF; final evidence uses canonical original-page extraction."
-            )
-        if config["embedding"]:
-            emb = config["embedding"]
-            vector = await self.gateway.embed(
-                self.profiles[emb["profile_id"]],
-                [emb["document_prefix"] + chunk["excerpt"] for chunk in chunks],
-            )
-            prepared["recordings"].append(vector["recording"])
-            prepared["vectors"] = vector["vectors"]
-            prepared["preparation_usage"] = vector["usage"]
             with self.store.session() as s:
                 self.store.owned(s, claim["id"], claim["owner_token"])
-            await self.vector_store().put(Scope(**scope), chunks, vector["vectors"], emb["dimensions"])
+                for source in sources:
+                    src = scoped(s, Source, source["source_id"], claim["project_id"])
+                    raw_paths[src.id] = self.store.path(
+                        scoped(s, Artifact, src.raw_artifact_id, claim["project_id"])
+                    )
+        prepared = await prepare_sources(
+            sources, config, scope, self.profiles, self.gateway, raw_paths=raw_paths, root=self.store.root
+        )
+        if config["embedding"]:
+            with self.store.session() as s:
+                self.store.owned(s, claim["id"], claim["owner_token"])
+            await self.vector_store().put(
+                Scope(**scope), prepared["chunks"], prepared["vectors"], config["embedding"]["dimensions"]
+            )
         with self.store.session() as s:
             self.store.owned(s, claim["id"], claim["owner_token"])
             bundle = scoped(s, IndexBundle, claim["resource_id"], claim["project_id"])
             artifact = self.store.put(s, bundle.project_id, "prepared_index", canonical(prepared), scope)
-            for item in chunks + parents:
+            for item in prepared["chunks"] + prepared["parents"]:
                 id = digest(dict(**scope, candidate_id=item["candidate_id"]))
                 if s.get(Chunk, id) is None:
                     s.add(
@@ -556,9 +523,16 @@ class Worker:
                     canonical(result["recordings"]),
                     dict(lane_id=lane.id, run_id=claim["resource_id"]),
                 )
+                profile_artifact = self.store.put(
+                    s,
+                    claim["project_id"],
+                    "provider_profiles",
+                    canonical([p.model_dump() for p in self.profiles.values()]),
+                    dict(lane_id=lane.id, run_id=claim["resource_id"]),
+                )
                 saved.provenance = dict(
                     saved.provenance,
-                    artifact_ids=[*saved.provenance["artifact_ids"], artifact.id],
+                    artifact_ids=[*saved.provenance["artifact_ids"], artifact.id, profile_artifact.id],
                     cache_state=cache_state,
                 )
             result["metrics"]["total_ms"] = (time.monotonic() - started) * 1000

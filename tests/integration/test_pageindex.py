@@ -159,6 +159,11 @@ def test_all_tree_preparation_query_events_and_shared_answer_contract(client, tm
     assert evidence[0]["tree_node_ids"]
     assert "Synchronize" in lane["answer"]
     assert "tree.nodes_selected" in client.get("/api/v1/runs/" + run["id"] + "/events").text
+    from tests.integration.test_export import export_lane
+
+    exported, archive = export_lane(client, worker, result)
+    assert exported["manifest"]["technique"] == "pageindex"
+    assert "tree_selection" in exported["manifest"]["verification"]["offline_replay"]["recorded_boundaries"]
     # Compatibility applies to the whole corpus; no silently ignored text sources.
     text_src = client.post(
         f"/api/v1/projects/{project}/sources/upload",

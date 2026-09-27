@@ -190,6 +190,10 @@ def test_encrypted_scoped_snapshot_preview_and_queries_do_not_reconnect(client, 
     ]
     assert evidence[0]["location"]["record_key"] == {"tenant": 1, "id": 1}
     assert "clock drift" in evidence[0]["excerpt"] and "Changed after capture" not in json.dumps(evidence)
+    from tests.integration.test_export import export_lane
+
+    exported, archive = export_lane(client, worker, result, include_data=True)
+    assert exported["manifest"]["source_hashes"][0]["source_format"] == "postgres_snapshot"
     worker.close()
 
 

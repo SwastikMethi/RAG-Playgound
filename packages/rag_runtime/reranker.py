@@ -58,6 +58,16 @@ def score(question, candidates, config):
     ]
 
 
+def request_hash(question, candidates, config):
+    return digest(
+        dict(
+            question=question,
+            config=config,
+            candidates=[dict(candidate_id=c["candidate_id"], excerpt=c["excerpt"]) for c in candidates],
+        )
+    )
+
+
 async def rerank(question, candidates, config):
     if not candidates:
         return dict(candidates=[], wait_ms=0, recording=None)
@@ -71,7 +81,11 @@ async def rerank(question, candidates, config):
     return dict(
         candidates=result["candidates"],
         wait_ms=wait,
-        recording=dict(operation="reranking", request_sha256=digest(request), response=result["candidates"]),
+        recording=dict(
+            operation="reranking",
+            request_sha256=request_hash(question, candidates, config),
+            response=result["candidates"],
+        ),
     )
 
 

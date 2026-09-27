@@ -10,7 +10,7 @@ Implementation is in progress on `codex/implement-rag-playground`. The approved 
 | M3 traces/recovery | Verified event and recovery path | 25 Python checks, 3 frontend checks; fixed workflow graphs and step inspector; persisted replay, Unicode/citation integrity, cancellation, deadlines and worker fencing |
 | M4 hierarchy/PageIndex | Implemented; live models pending | Real parent-child vector path; PageIndex 0.2.19 PDF indexing, tree/page APIs, bounded selection and end-to-end worker tested with synthetic model boundaries |
 | M5 PostgreSQL source | Implemented and integration checked | Encrypted credentials, exact host/relation/column policy, read-only repeatable-read snapshots, stable keys, preview, refresh and row evidence; three real PostgreSQL integration tests |
-| M6 export | Pending | |
+| M6 export | Implemented and replay checked | Shared runtime/preparation, all six adapter exports, PostgreSQL snapshots, no-data privacy, copied-runtime replay, standalone CLI/API, protected ZIP download |
 | M7 product completion | Pending | |
 | M8 release verification | Pending | |
 
@@ -20,7 +20,7 @@ All 16 original implementation documents, six configuration examples, 45 trace e
 
 ## Decisions
 
-- The user selected the standard OpenAI API endpoint. Server profiles use GPT-4.1 mini (2025-04-14 snapshot) and text-embedding-3-small (1,536 dimensions). OPENAI_API_KEY is still required for live verification.
+- The user selected the standard OpenAI API endpoint. Server profiles use GPT-4.1 mini (2025-04-14 snapshot) and text-embedding-3-small (1,536 dimensions). The supplied OPENAI_API_KEY is stored only in the ignored local .env; live calls remain to be verified.
 - This was a new directory with no Git history or unrelated application changes; implementation uses a dedicated initial branch in place.
 - PostgreSQL owns jobs and event recovery; no Redis or extra broker.
 - Fixture preview is explicit and separate from live projects.
@@ -47,3 +47,9 @@ Release-wide checks and full rendered state coverage remain pending. Actual rera
 ## PostgreSQL snapshot verification
 
 Three real PostgreSQL tests pass with a dedicated column-scoped read-only role: hostile quoted identifiers, encrypted credentials, approved columns, cross-project isolation, duplicate/null key rejection, write-role rejection, row/byte caps, repeatable-read isolation and statement deadlines. Capture refresh creates a distinct source; old answers use frozen row text after database mutation and connection deletion. Two execution/network checks also pass, including metadata-address rejection. The connection UI and row inspector compile; rendered connector review remains in M7. Setup policy is documented in [operating instructions](docs/17_RUNNING_THE_APPLICATION.md).
+
+## Export verification
+
+The full application suite passes 41 tests (98.90 s), including six export integration tests, actual PageIndex SDK export replay and captured PostgreSQL row export. Offline replay runs the copied runtime in an owned subprocess and compares evidence IDs/order, source mapping, exact generation-context requests and answer assembly. Qdrant local exact replay uses stored embeddings; model, reranker and tree-selection responses are recorded boundaries. This does not claim remote HNSW or fresh provider performance.
+
+No-data archive scans exclude private fixture text, original file names, questions, answers and application tokens. Included-data ingestion rejects changed source hashes. A corrupted boundary recording fails the export and removes its download URL. The generated lock resolves independently and installs 165 dependencies in an isolated virtual environment; standalone ingest, query and API checks use the labeled synthetic model provider. Browser upload → prepare → answer → evidence → workflow → replay → export/download passes (11.0 s). The production frontend build passes. Inspected `test-results/export-desktop.png`; design density and checkbox alignment remain for M7. No public deployment was performed.

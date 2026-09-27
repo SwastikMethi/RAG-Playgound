@@ -26,6 +26,7 @@ async def execute(
     result: dict | None = None,
     vector_store=None,
     started: float | None = None,
+    rerank_fn=rerank,
 ) -> dict:
     result = result if result is not None else {}
     result.update(
@@ -176,7 +177,7 @@ async def execute(
                 "rerank", retrieval.id, dict(model=config["reranker"]["model"])
             ) as reranking:
                 before = {c["candidate_id"]: c["rank"] for c in candidates}
-                ranked = await rerank(question, candidates, config["reranker"])
+                ranked = await rerank_fn(question, candidates, config["reranker"])
                 candidates = ranked["candidates"]
                 reranking.wait_ms = ranked["wait_ms"]
                 reranking.details = dict(
