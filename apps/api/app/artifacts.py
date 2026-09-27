@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import tempfile
 from pathlib import Path
 
@@ -18,7 +19,12 @@ class S3ArtifactBackend:
             except ImportError as error:  # pragma: no cover - cloud-only path
                 raise RuntimeError("boto3 is required when RAG_ARTIFACT_BUCKET is configured") from error
             client = boto3.client(
-                "s3", region_name=region, config=Config(s3={"addressing_style": "path"})
+                "s3",
+                region_name=region,
+                endpoint_url=os.environ.get("AWS_ENDPOINT_URL_S3"),
+                aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
+                aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+                config=Config(s3={"addressing_style": "path"}),
             )
         self.bucket, self.client = bucket, client
 

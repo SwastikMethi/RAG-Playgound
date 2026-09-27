@@ -87,6 +87,23 @@ def test_lambda_loads_only_string_secret_settings():
     assert environment == {"RAG_DATABASE_URL": "postgresql://db"}
 
 
+def test_s3_backend_uses_credentials_loaded_after_boto_session_creation(monkeypatch):
+    from app.artifacts import S3ArtifactBackend
+    import boto3
+
+    captured = {}
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "neon-access")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "neon-secret")
+    monkeypatch.setenv("AWS_ENDPOINT_URL_S3", "https://storage.example")
+    monkeypatch.setattr(boto3, "client", lambda service, **kwargs: captured.update(service=service, **kwargs))
+
+    S3ArtifactBackend("docs", "us-east-2")
+
+    assert captured["aws_access_key_id"] == "neon-access"
+    assert captured["aws_secret_access_key"] == "neon-secret"
+    assert captured["endpoint_url"] == "https://storage.example"
+
+
 def test_committed_job_wake_uses_fifo_identity():
     from app.database import publish_wakes
 
