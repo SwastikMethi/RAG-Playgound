@@ -937,7 +937,7 @@ export function Workspace({
                               <Settings2 size={15} />
                             </Button>
                           )}
-                          {!terminal(state?.status || "queued") && (
+                          {active && !replaying && !terminal(state?.status || "queued") && (
                             <Button
                               tone="danger"
                               onClick={() =>
@@ -993,8 +993,10 @@ export function Workspace({
                                 </ReactMarkdown>
                               ) : (
                                 <p className="muted">
-                                  {state?.status === "running"
-                                    ? "Retrieving evidence…"
+                                  {terminal(state?.status || "")
+                                    ? "No answer text was recorded."
+                                    : state?.status === "running"
+                                    ? Object.values(state.stages).some((step) => step.name === "generation") ? "Waiting for first answer text…" : "Retrieving evidence…"
                                     : "Waiting for this lane."}
                                 </p>
                               )}

@@ -90,6 +90,8 @@ try {
       await page.getByRole("combobox", { name: "Status", exact: true }).selectOption(status);
       await page.locator(".history-list > button").filter({ hasText: history.items[0].question }).first().click();
       await page.getByLabel("Replay position").waitFor();
+      await page.locator(".answer-lane").first().getByRole("button", { name: "Run this lane again" }).waitFor();
+      assert(!await page.locator(".answer-text").first().innerText().then((text) => text.includes("Waiting for this lane")), `Terminal ${status} lane must not say it is waiting`);
       await page.screenshot({ path: `${output}/${status}-desktop.png`, fullPage: true });
       reviewedStates.push(status);
       break;
