@@ -380,6 +380,12 @@ export function StepInspector({
           </>
         )}
         {step.error && <ErrorNotice message={step.error} />}
+        {step.name === "context_packing" && typeof step.details.token_count === "number" && (
+          <>
+            <p>{`${step.details.token_count} of ${step.details.budget_tokens} context tokens used`} ({String(step.details.token_count_kind)} count).</p>
+            {Array.isArray(step.details.excluded_candidate_ids) && <p>{`${step.details.excluded_candidate_ids.length} candidate${step.details.excluded_candidate_ids.length === 1 ? "" : "s"} excluded`} from this context. {step.details.excluded_candidate_ids.length > 0 && "Individual exclusion reasons were not recorded."}</p>}
+          </>
+        )}
         <h4>Measured duration</h4>
         <p>{duration(step.duration)}</p>
         <h4>Next dependency</h4>
@@ -387,7 +393,7 @@ export function StepInspector({
       </div>
       {candidates.length > 0 && (
         <>
-          <h3 className="spaced">Recorded candidates</h3>
+          <h3 className="spaced">{step.name === "context_packing" ? "Selected evidence" : "Recorded candidates"}</h3>
           <ol className="candidate-list">
             {candidates.map((item) => (
               <li key={item.candidate_id}>

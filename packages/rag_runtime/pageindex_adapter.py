@@ -214,6 +214,7 @@ async def retrieve_tree(question, documents, config, profiles, gateway, trace, p
                 summary="Validated document IDs selected by the configured model.",
             )
     visited, leaves = 0, []
+    limits_reached = set()
     frontier = [(d, d["nodes"], 0, None) for d in selected_docs]
     while frontier and visited < config["max_nodes"] and calls < config["max_calls"]:
         doc, nodes, depth, ancestor = frontier.pop(0)
@@ -252,31 +253,33 @@ async def retrieve_tree(question, documents, config, profiles, gateway, trace, p
                 summary=f"{visited} visited nodes; {calls} selection calls used.",
             )
             for node in picks:
-                if (
-                    chosen["stop"]
-                    or not node["children"]
-                    or depth + 1 >= config["max_depth"]
-                    or visited >= config["max_nodes"]
-                    or calls >= config["max_calls"]
-                ):
+                blocked = {
+                    name for name, exhausted in (
+                        ("depth", depth + 1 >= config["max_depth"]),
+                        ("node", visited >= config["max_nodes"]),
+                        ("call", calls >= config["max_calls"]),
+                    ) if exhausted
+                }
+                if chosen["stop"] or not node["children"]:
+                    leaves.append((doc, node))
+                elif blocked:
+                    limits_reached.update(blocked)
                     leaves.append((doc, node))
                 else:
                     frontier.append((doc, node["children"], depth + 1, node))
     # At an exhausted budget, the last observed parent is still a valid selected section.
     leaves.extend((doc, ancestor) for doc, _, _, ancestor in frontier if ancestor)
     if frontier:
-        await trace.emit(
-            "warning",
-            dict(
-                code="TREE_BUDGET_REACHED",
-                message="Tree navigation stopped at its configured call or node limit. Selected parent pages were retained.",
-            ),
-        )
+        if visited >= config["max_nodes"]:
+            limits_reached.add("node")
+        if calls >= config["max_calls"]:
+            limits_reached.add("call")
     pages = {}
     for doc, node in leaves:
         for page in range(node["page_start"], node["page_end"] + 1):
             key = (doc["source"]["source_id"], page)
             if key not in pages and len(pages) >= config["max_pages"]:
+                limits_reached.add("page")
                 continue
             if key not in pages:
                 src = doc["source"]
@@ -301,4 +304,12 @@ async def retrieve_tree(question, documents, config, profiles, gateway, trace, p
                 )
             if node["node_id"] not in pages[key]["tree_node_ids"]:
                 pages[key]["tree_node_ids"].append(node["node_id"])
+    if limits_reached:
+        await trace.emit(
+            "warning",
+            dict(
+                code="TREE_BUDGET_REACHED",
+                message=f"Tree retrieval reached its {', '.join(sorted(limits_reached))} limit. Further navigation or pages were omitted; available selected pages were retained within the page cap.",
+            ),
+        )
     return [p for p in pages.values() if p["excerpt"].strip()]

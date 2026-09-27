@@ -1,6 +1,6 @@
 # Implementation status
 
-M0–M8 implementation and release checks are complete on `codex/implement-rag-playground`; independent whole-branch review is underway. Scope: [execution plan](docs/14_EXECUTION_PLAN.md). Release gate: [document 11](docs/11_ACCEPTANCE_TESTS.md). No public deployment was performed.
+M0–M8 implementation, release checks and independent whole-branch review are complete on `codex/implement-rag-playground`. Scope: [execution plan](docs/14_EXECUTION_PLAN.md). Release gate: [document 11](docs/11_ACCEPTANCE_TESTS.md). No public deployment was performed.
 
 ## Working application
 
@@ -12,10 +12,10 @@ Start with [README.md](README.md) or [operating instructions](docs/17_RUNNING_TH
 
 | Check | Result |
 | --- | --- |
-| Python unit/integration | M8 aggregate: 49 passed, four dependency deprecation warnings, 132.43 seconds |
-| Frontend reducer/replay | `npm test`: 3 passed |
-| TypeScript/production build | Passed; main chunk warning: 631 kB, 196 kB gzip |
-| Browser journeys | 2 passed, 33.4 s including startup; real API/workers/PostgreSQL/Qdrant, explicitly synthetic model responses |
+| Python unit/integration | Final post-review suite: 50 passed, four dependency deprecation warnings, 182.88 seconds |
+| Frontend reducer/replay | `npm test`: 5 passed |
+| TypeScript/production build | Passed; main chunk warning: 632 kB, 196 kB gzip |
+| Browser journeys | 2 passed, 34.2 s including startup; real API/workers/PostgreSQL/Qdrant, explicitly synthetic model responses |
 | Pack validator | Passed: 44 API operations, six configurations, 45 example events; separate from application checks |
 | Ruff | Passed |
 | Linux/Node 22 image | Builds; API, Docling, PageIndex and PyTorch `2.11.0+cpu` imports passed; final image freshness recorded below |
@@ -44,6 +44,8 @@ Reviewed 1440×900, 1024×768 and 390×844 with all six live lanes, plus doubled
 
 All 35 observed steps expose purpose, input, action/result and measured duration. Parallel hybrid branches join visibly; rank changes link to the recorded passage; parent expansion links children to parents; PageIndex lists selected sections/pages. No private model reasoning or unobserved internals are fabricated. Replay frames 0/70/140 reconstruct the completed answers with original timings. Previous/next/seek, 4× speed, compressed waits and keyboard citation inspection passed with no browser errors.
 
+The final packing inspector also exposes the exact recorded token count/budget, excluded count and selected passages (`packing-desktop.png`). The app and worker are running locally; authenticated readiness and all six technique capabilities pass (`.data/release/readiness.json`).
+
 Inspected local screenshots under `.data/release/visuals`: `six-lanes-1440.png`, `six-lanes-1024.png`, `six-lanes-390.png`, `workflow-*.png`, `pageindex-source-mobile.png`, `zoom-200.png`, `replay-start.png`, `replay-middle.png`, `replay-end.png`, `failed-desktop.png` and `cancelled-desktop.png`. Browser screenshots cover connector, export, setup and disconnected states. Machine-readable record: `.data/release/visual-review.json`. Review found and fixed saved-history setup restoration, 200% zoom overflow, initial project-selection races, missing passage identity in reranking, unclear parent-child links and misleading waiting/stop controls on terminal replay.
 
 ## Boundaries and operator setup
@@ -55,3 +57,16 @@ Inspected local screenshots under `.data/release/visuals`: `six-lanes-1440.png`,
 - OCR, analytical text-to-SQL, live database sync, GraphRAG/RAPTOR, automatic optimization, additional connectors and multi-user SaaS are outside agreed v1. No in-scope adapter or PostgreSQL connector was deferred.
 
 See [acceptance evidence map](docs/18_RELEASE_EVIDENCE.md).
+
+## Independent review and decisions
+
+A fresh `gpt-6-astra` reviewer inspected the whole implementation without making changes or model calls. It found three Important issues, all reproduced by failing regressions and fixed: preserve pre-start lane cancellation during replay; visibly report actual PageIndex depth/node/call/page truncation; retain and display the recorded context-packing decision. The full suite and rendered review then passed. No Critical or Minor findings, and no behaviors declined for judgment. No second review is claimed.
+
+Execution rulings, in order:
+
+1. This new repository uses a dedicated initial implementation branch in the requested directory. Cost if wrong: move the branch into an isolated worktree.
+2. The pack validator scans specification/fixture files; application checks run separately. Cost if wrong: add future specification directories explicitly.
+3. Offline vector replay uses Qdrant local exact search with recorded embeddings while running the actual retrieval/context/tree algorithms. Cost if wrong: remote approximate-search differences require a separate live comparison.
+4. Linux uses CPU-only PyTorch; macOS uses its native wheel. Cost if wrong: GPU operators must supply and validate a CUDA lock/build.
+
+Deferred minors: none from the independent review. Documented platform/performance checks above remain unperformed; they are not deferred v1 features.

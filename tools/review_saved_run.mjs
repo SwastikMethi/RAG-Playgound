@@ -43,6 +43,11 @@ try {
       const stepName = await steps.nth(j).innerText();
       if (stepName.includes("Rerank passages")) assert.match(await panel.locator(".rank-table").innerText(), /fictional-clock-guide/);
       if (stepName.includes("Expand parents")) assert.match(text, /Matched child passages/);
+      if (stepName.includes("Pack evidence")) {
+        assert.match(text, /context tokens used/);
+        assert.match(text, /candidate[s]? excluded/);
+        if (i === 0) await page.screenshot({ path: `${output}/packing-desktop.png` });
+      }
       inspected++;
       if (stepName.match(/Rerank|Expand parent|Navigate sections/) || j === 1) await page.screenshot({ path: `${output}/workflow-${lane.technique}.png` });
       await page.getByRole("button", { name: "Close inspector" }).click();

@@ -116,6 +116,33 @@ async def test_bounded_tree_controller_rejects_invented_ids_repairs_once_and_use
 
 
 @pytest.mark.asyncio
+async def test_tree_warns_only_when_a_limit_prevents_navigation_or_pages():
+    import json
+
+    profile = Profile(id="select", label="Test", model="test", kind="fixture", operations=["tree_selection"], tokenizer="cl100k_base")
+    for limit, stop, warning in [("max_depth", False, True), ("max_nodes", False, True), ("max_calls", False, True), ("max_pages", True, True), ("max_calls", True, False)]:
+        config = dict(max_documents=3, max_depth=4, max_nodes=12, max_calls=8, max_pages=12, selection_profile_id="select", selection_model="test")
+        config[limit] = 1
+        events = []
+
+        async def emit(kind, payload):
+            events.append((kind, payload))
+
+        class Gateway:
+            async def complete(self, *args, **kwargs):
+                return dict(text=json.dumps({"ids": ["section-a"], "stop": stop}), usage=empty_usage(), wait_ms=0, recording={})
+
+        result = dict(recordings=[], usage=empty_usage(), metrics={"provider_wait_ms": None})
+        candidates = await retrieve_tree("X", [document()], config, {"select": profile}, Gateway(), Trace(emit), None, result)
+        warnings = [p for kind, p in events if kind == "warning" and p["code"] == "TREE_BUDGET_REACHED"]
+        assert bool(warnings) is warning, limit
+        assert len(warnings) <= 1
+        assert len(candidates) == (1 if limit == "max_pages" else 2)
+        if warning:
+            assert limit.removeprefix("max_").rstrip("s") in warnings[0]["message"], limit
+
+
+@pytest.mark.asyncio
 async def test_cancelled_tree_selection_cannot_emit_selection_or_evidence():
     class Slow:
         async def complete(self, *args, **kwargs):

@@ -66,7 +66,7 @@ export async function reduceEvent(
   };
   if (event.type === "run.started") {
     next.status = "running";
-    for (const id of p.lane_ids as string[]) next.lanes[id] = emptyLane();
+    for (const id of p.lane_ids as string[]) next.lanes[id] ??= emptyLane();
   } else if (event.type.startsWith("run.")) next.status = String(p.status);
   if (event.lane_id) {
     const previous = state.lanes[event.lane_id] || emptyLane();
@@ -110,9 +110,7 @@ export async function reduceEvent(
           JSON.stringify(p.invalid_citation_labels)
       )
         return resync(state);
-    } else if (event.type === "context.selected")
-      lane.evidence = p.evidence as Evidence[];
-    else if (event.type === "warning")
+    } else if (event.type === "warning")
       lane.warnings = [...lane.warnings, String(p.message)];
     else if (event.type === "stage.started") {
       lane.stages[String(p.span_id)] = {
@@ -144,6 +142,7 @@ export async function reduceEvent(
         "retrieval.candidates",
         "tree.nodes_selected",
         "rerank.completed",
+        "context.selected",
       ].includes(event.type)
     ) {
       const prior = lane.stages[String(p.span_id)];
@@ -156,6 +155,11 @@ export async function reduceEvent(
         },
       };
       lane.stages[stage.id] = stage;
+      if (event.type === "context.selected") {
+        lane.evidence = p.evidence as Evidence[];
+        stage.candidates = lane.evidence;
+        stage.details = { ...stage.details, token_count: p.token_count, token_count_kind: p.token_count_kind, budget_tokens: p.budget_tokens, excluded_candidate_ids: p.excluded_candidate_ids };
+      }
       if (event.type === "retrieval.candidates")
         stage.candidates = p.candidates as Evidence[];
       if (event.type === "tree.nodes_selected")
