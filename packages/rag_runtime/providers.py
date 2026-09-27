@@ -36,6 +36,8 @@ class Profile(BaseModel):
     tokenizer: str | None = None
     supports_temperature: bool = True
     supports_seed: bool = False
+    completion_token_parameter: Literal["max_tokens", "max_completion_tokens"] = "max_tokens"
+    reasoning_effort: Literal["none", "minimal", "low", "medium", "high", "xhigh", "max"] | None = None
     revision: str = "1"
 
     @property
@@ -70,7 +72,19 @@ class Profile(BaseModel):
         )
 
     def fingerprint(self):
-        return digest(self.model_dump(exclude={"api_key_env", "label"}))
+        values = self.model_dump(exclude={"api_key_env", "label"})
+        # New default options must not invalidate existing profiles and vector indexes.
+        if self.completion_token_parameter == "max_tokens":
+            values.pop("completion_token_parameter")
+        if self.reasoning_effort is None:
+            values.pop("reasoning_effort")
+        return digest(values)
+
+    def completion_options(self, max_tokens: int) -> dict:
+        options = {self.completion_token_parameter: max_tokens}
+        if self.reasoning_effort is not None:
+            options["reasoning_effort"] = self.reasoning_effort
+        return options
 
 
 def load_profiles(settings):
@@ -163,6 +177,13 @@ def provider_error(exc):
     status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None
     if status in {401, 403}:
         return Problem("PROVIDER_AUTH", "The model provider rejected its server-side credentials.", 502)
+    if status in {400, 422}:
+        return Problem(
+            "PROVIDER_FAILED",
+            "The model provider rejected the request settings. Check the model profile's token-limit "
+            "parameter, reasoning effort and supported generation options.",
+            502,
+        )
     retryable = status in {429, 500, 502, 503, 504} or isinstance(exc, httpx.TransportError)
     return Problem("PROVIDER_FAILED", "The model provider could not complete the request.", 502, retryable)
 
@@ -214,7 +235,9 @@ class Gateway:
             raise Problem(
                 "MODEL_INPUT_LIMIT", "The tree selection or indexing prompt exceeds this model's input limit."
             )
-        payload = dict(model=profile.model, messages=messages, stream=False, max_tokens=max_tokens)
+        payload = dict(
+            model=profile.model, messages=messages, stream=False, **profile.completion_options(max_tokens)
+        )
         if profile.supports_temperature:
             payload["temperature"] = 0
         if json_mode:
@@ -389,8 +412,8 @@ class Gateway:
                     model=profile.model,
                     messages=messages,
                     stream=True,
-                    max_tokens=generation["max_output_tokens"],
                     stream_options={"include_usage": True},
+                    **profile.completion_options(generation["max_output_tokens"]),
                 )
                 if profile.supports_temperature:
                     payload["temperature"] = generation["temperature"]
