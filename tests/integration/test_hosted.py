@@ -329,3 +329,81 @@ def test_atomic_storage_queue_vector_and_disk_limits(hosted, account, monkeypatc
     monkeypatch.setattr(shutil, "disk_usage", lambda path: type("Usage", (), {"free": 0})())
     settings.min_free_bytes = 1
     assert hosted.post("/api/v1/projects", json={"name": "No disk"}).status_code == 503
+
+
+@pytest.mark.parametrize("has_key", [True, False])
+def test_live_export_credentials_survive_environment_alias_changes(hosted, account, monkeypatch, has_key):
+    import asyncio
+    import workers.main as worker_module
+    import workers.export as exporting
+    from tests.integration.test_export import completed_lane
+    original_load = worker_module.load_profiles
+    def profiles(settings):
+        return {id: p.model_copy(update={"api_key_env": "OLD_KEY_" + str(i)})
+                for i, (id, p) in enumerate(original_load(settings).items())}
+    monkeypatch.setattr(worker_module, "load_profiles", profiles)
+    key = "sk-private-export-owner"
+    hosted.put("/api/v1/me/openai-key", json={"api_key": key}).raise_for_status()
+    worker, run, _ = completed_lane(hosted, "bm25")
+    if not has_key:
+        hosted.delete("/api/v1/me/openai-key").raise_for_status()
+    for p in worker.profiles.values():
+        monkeypatch.setenv(p.api_key_env, "ambient-owner-key-must-not-be-used")
+        p.api_key_env = "NEW_" + p.api_key_env
+    original_process = exporting.run_json
+    selected_owner = []
+    async def inspect_process(arguments, **kwargs):
+        if kwargs.get("input_data", {}).get("mode") != "live":
+            return await original_process(arguments, **kwargs)
+        # A real child process resolves the exact replay profiles against its inherited environment.
+        expected = key if has_key else ""
+        code = ("import json,sys; from pathlib import Path; from rag_runtime.providers import Profile; "
+                "request=json.loads(Path(sys.argv[1]).read_text()); "
+                f"print(json.dumps({{'owner_only':all(Profile.model_validate(p).key == {expected!r} for p in request['profiles'])}}))")
+        result = await original_process(["-c", code], **kwargs)
+        selected_owner.append(result["owner_only"])
+        return dict(evidence_matches=True, answer_matches=True)
+    monkeypatch.setattr(exporting, "run_json", inspect_process)
+    try:
+        # Exercise live-export dispatch over fixture recordings without a provider call.
+        from app.models import Run
+        monkeypatch.setattr(hosted.app.state.settings, "mode", "live")
+        with hosted.app.state.store.session() as s:
+            s.get(Run, run["id"]).mode = "live"
+        lane = run["lanes"][0]
+        response = hosted.post(f"/api/v1/runs/{run['id']}/lanes/{lane['id']}/exports",
+            headers={"Idempotency-Key":str(uuid4())}, json={"include_data":False,"verification_mode":"live"})
+        assert response.status_code == 202, response.text
+        asyncio.run(worker.run_resource(response.json()["id"]))
+        assert selected_owner == [True]
+        assert hosted.get("/api/v1/exports/"+response.json()["id"]).json()["status"] == "ready"
+    finally:
+        worker.close()
+
+
+def test_vector_quota_rejects_before_embedding_charge(hosted, account, monkeypatch):
+    import asyncio
+    from workers.main import Worker
+    hosted.app.state.settings.max_vectors_per_user = 1
+    worker = Worker(hosted.app.state.settings)
+    project = hosted.post("/api/v1/projects", json={"name":"Quota before provider"}).json()["id"]
+    root = "/api/v1/projects/"+project
+    source = hosted.post(root+"/sources/upload", files={"file":("clock.txt", "clock drift "*600)}).json()
+    asyncio.run(worker.run_resource(source["id"]))
+    corpus = hosted.post(root+"/corpus-versions",json={"source_ids":[source["id"]]}).json()
+    config = next(c["default_config"] for c in hosted.get("/api/v1/system/capabilities").json()["items"] if c["technique"]=="dense")
+    saved = hosted.post(root+"/configurations",json={"name":"Dense","config":config}).json()
+    bundle = hosted.post(root+"/preparations",headers={"Idempotency-Key":str(uuid4())},
+                         json={"config_id":saved["id"],"corpus_version_id":corpus["id"]}).json()
+    original_embed, calls = worker.gateway.embed, []
+    async def embed(*args):
+        calls.append(True)
+        return await original_embed(*args)
+    monkeypatch.setattr(worker.gateway,"embed",embed)
+    try:
+        asyncio.run(worker.run_resource(bundle["id"]))
+        failed = hosted.get("/api/v1/index-bundles/"+bundle["id"]).json()
+        assert failed["error"]["code"] == "QUOTA_EXCEEDED"
+        assert calls == []
+    finally:
+        worker.close()

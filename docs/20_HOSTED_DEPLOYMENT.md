@@ -99,6 +99,14 @@ corpus cap. Metadata admission uses a short global database lock; this is an
 intentional small-beta throughput limit. New instances are not horizontally
 scalable without revisiting volume/worker coordination.
 
+Caddy limits request headers to 10 seconds and upload bodies to 60 seconds, so
+stalled clients release connections. Uploads on slower connections must finish
+within that window. Response writes have no deadline, preserving streamed
+answers. [Caddy timeouts](https://caddyserver.com/docs/caddyfile/options#timeouts).
+To check this against an isolated HTTP Caddy bound to a loopback port, run
+`python tools/verify_proxy.py http://127.0.0.1:18888`; it checks a stalled body,
+a complete 1 MiB body reaching the Session/Origin guards, and health afterward.
+
 PostgreSQL snapshot sources remain supported but disabled until the operator
 sets both exact `RAG_DATABASE_HOST_ALLOWLIST` and relation/column policy in
 `.env.production`. Follow document 17 for a read-only source login. Never allow

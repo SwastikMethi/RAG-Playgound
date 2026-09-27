@@ -330,9 +330,14 @@ async def export_lane(worker, claim):
                         "PROFILE_CHANGED",
                         "A provider profile changed since this lane. Save and run a new revision.",
                     )
+            # Saved environment aliases may have changed; bind every replay profile explicitly.
+            request["profiles"] = [
+                dict(profile, api_key_env=f"RAG_REPLAY_KEY_{i}")
+                for i, profile in enumerate(snapshot_profiles)
+            ]
             live = await run_json(
                 [str(folder / "scripts/verify.py")], input_data=request, root=folder, timeout=300,
-                env_extra={p.api_key_env: p.key for p in claim["profiles"].values() if p.api_key_env}
+                env_extra={p["api_key_env"]: claim["profiles"][p["id"]].key for p in request["profiles"]}
             )
             manifest["verification"]["live_replay"] = dict(
                 status="passed",

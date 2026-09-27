@@ -505,14 +505,17 @@ class Worker:
                     raw_paths[src.id] = self.store.path(
                         scoped(s, Artifact, src.raw_artifact_id, claim["project_id"])
                     )
-        prepared = await prepare_sources(
-            sources, config, scope, claim["profiles"], self.gateway, raw_paths=raw_paths, root=self.store.root
-        )
-        if config["embedding"]:
+        def reserve_before_embedding(count: int) -> None:
             with self.store.session() as s:
                 from app.quotas import reserve_vectors
                 job = self.store.owned(s, claim["id"], claim["owner_token"])
-                reserve_vectors(self.store, s, job, len(prepared["chunks"]))
+                reserve_vectors(self.store, s, job, count)
+
+        prepared = await prepare_sources(
+            sources, config, scope, claim["profiles"], self.gateway, raw_paths=raw_paths,
+            root=self.store.root, before_embedding=reserve_before_embedding,
+        )
+        if config["embedding"]:
             await self.vector_store().put(
                 Scope(**scope), prepared["chunks"], prepared["vectors"], config["embedding"]["dimensions"]
             )

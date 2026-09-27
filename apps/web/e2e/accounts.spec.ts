@@ -28,6 +28,13 @@ for (const width of [1440, 1024, 390]) test(`account signup and recovery at ${wi
   await page.goto('/login');
   await expect(page.getByRole('heading',{name:'Sign in to your workspace'})).toBeVisible();
   await page.screenshot({path:`.data/release/hosted/login-${width}.png`,fullPage:true});
+  if (width === 1024) {
+    await page.evaluate(() => { document.documentElement.style.zoom = '2'; });
+    await expect(page.getByRole('button',{name:'Sign in',exact:true})).toBeVisible();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+    await page.screenshot({path:'.data/release/hosted/login-zoom-1024.png',fullPage:true});
+    await page.evaluate(() => { document.documentElement.style.zoom = ''; });
+  }
   await page.getByRole('link',{name:'Recover your account'}).click();
   await expect(page.getByLabel('Recovery code',{exact:true})).toBeVisible();
 });

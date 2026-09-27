@@ -1,11 +1,15 @@
 """Shared preparation for the playground worker and portable application."""
 
 from importlib.metadata import version
+from collections.abc import Callable
 from .chunking import chunk_source, parent_child_chunks
 from .errors import Problem
 
 
-async def prepare_sources(sources, config, scope, profiles, gateway, *, raw_paths=None, root=None):
+async def prepare_sources(
+    sources, config, scope, profiles, gateway, *, raw_paths=None, root=None,
+    before_embedding: Callable[[int], None] | None = None,
+):
     chunks, parents = [], []
     for source in sources:
         if config["tree"]:
@@ -48,6 +52,8 @@ async def prepare_sources(sources, config, scope, profiles, gateway, *, raw_path
         )
         prepared["versions"]["pageindex"] = config["tree"]["sdk_version"]
     if config["embedding"]:
+        if before_embedding:
+            before_embedding(len(chunks))
         emb = config["embedding"]
         vector = await gateway.embed(
             profiles[emb["profile_id"]], [emb["document_prefix"] + c["excerpt"] for c in chunks]
