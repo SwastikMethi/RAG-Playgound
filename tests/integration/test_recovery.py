@@ -1,4 +1,5 @@
 import asyncio
+from copy import deepcopy
 from datetime import timedelta
 from uuid import uuid4
 
@@ -38,14 +39,14 @@ def prepared(client):
     ).json()
     asyncio.run(worker.run_once(bundle["job_id"]))
 
-    def create():
+    def create(lane_count=1):
         response = client.post(
             f"/api/v1/projects/{project}/runs",
             headers={"Idempotency-Key": str(uuid4())},
             json=dict(
                 corpus_version_id=corpus["id"],
                 question="How do I fix clock drift?",
-                lanes=[dict(config_id=config["id"], bundle_id=bundle["id"])],
+                lanes=[dict(config_id=config["id"], bundle_id=bundle["id"])] * lane_count,
             ),
         )
         assert response.status_code == 202, response.text
@@ -53,6 +54,70 @@ def prepared(client):
 
     yield worker, create
     worker.close()
+
+
+@pytest.mark.asyncio
+async def test_five_lanes_share_one_cancellation_poll_and_cancel_independently(client, prepared):
+    from sqlalchemy import event
+    from app.models import Lane
+
+    worker, create = prepared
+    run = create(5)
+    with worker.store.session() as s:
+        lanes = list(s.scalars(select(Lane).where(Lane.run_id == run["id"])))
+        for lane in lanes:
+            snapshot = deepcopy(lane.config_snapshot)
+            snapshot["limits"]["lane_timeout_ms"] = 5000
+            lane.config_snapshot = snapshot
+
+    release = asyncio.Event()
+
+    async def stream(*_args):
+        yield dict(text="Partial")
+        await release.wait()
+        yield dict(text=" complete")
+
+    worker.gateway.stream = stream
+    ownership_reads = []
+
+    def capture(_connection, _cursor, statement, _parameters, _context, _many):
+        if "FROM jobs" in statement and "FOR UPDATE" in statement:
+            ownership_reads.append(statement)
+
+    event.listen(worker.store.engine, "before_cursor_execute", capture)
+    task = asyncio.create_task(worker.run_resource(run["id"]))
+    try:
+        for _ in range(200):
+            saved = client.get("/api/v1/runs/" + run["id"]).json()
+            if len(saved["lanes"]) == 5 and all(lane["answer"] for lane in saved["lanes"]):
+                break
+            await asyncio.sleep(0.02)
+        assert all(lane["answer"] == "Partial" for lane in saved["lanes"])
+        ownership_reads.clear()
+        await asyncio.sleep(0.35)
+        assert len(ownership_reads) <= 1
+
+        cancelled = saved["lanes"][0]["id"]
+        response = client.post(f"/api/v1/runs/{run['id']}/lanes/{cancelled}/cancel")
+        assert response.status_code == 202, response.text
+        for _ in range(150):
+            saved = client.get("/api/v1/runs/" + run["id"]).json()
+            if next(lane for lane in saved["lanes"] if lane["id"] == cancelled)["status"] == "cancelled":
+                break
+            await asyncio.sleep(0.02)
+        release.set()
+        await asyncio.wait_for(task, 5)
+        saved = client.get("/api/v1/runs/" + run["id"]).json()
+        assert next(lane for lane in saved["lanes"] if lane["id"] == cancelled)["status"] == "cancelled"
+        assert all(
+            lane["status"] == "completed" and lane["answer"] == "Partial complete"
+            for lane in saved["lanes"]
+            if lane["id"] != cancelled
+        )
+    finally:
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)
+        event.remove(worker.store.engine, "before_cursor_execute", capture)
 
 
 def test_queued_cancellation_has_no_query_clock_or_provider_call(client, prepared):

@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import threading
 import time
 from datetime import timedelta
 from collections import OrderedDict
@@ -231,36 +232,40 @@ class Worker:
             elapsed,
         )
 
-    async def watch_lane(self, claim, lane_id, task):
-        while not task.done():
-            await asyncio.sleep(0.1)
+    def keep_lease(self, claim, task, loop, stopped):
+        while not stopped.wait(self.settings.heartbeat_seconds):
             try:
-                with self.store.session() as s:
-                    self.store.owned(s, claim["id"], claim["owner_token"])
-                    run = scoped(s, Run, claim["resource_id"], claim["project_id"])
-                    lane = s.scalar(select(Lane).where(Lane.id == lane_id, Lane.run_id == run.id))
-                    cancelled = run.cancel_requested_at or lane.cancel_requested_at or lane.status in TERMINAL
-                if cancelled:
-                    task.cancel()
-                    return
+                cancel = self.store.heartbeat(claim["id"], claim["owner_token"])
+                if cancel and claim["kind"] != "compare_run":
+                    loop.call_soon_threadsafe(task.cancel)
             except Problem:
-                task.cancel()
+                loop.call_soon_threadsafe(task.cancel)
                 return
 
-    async def watch(self, claim, task):
-        while not task.done():
-            await asyncio.sleep(self.settings.heartbeat_seconds)
-            try:
-                with self.store.session() as s:
-                    job = self.store.owned(s, claim["id"], claim["owner_token"])
-                    cancel = bool(job.cancel_requested_at)
-                if cancel and claim["kind"] != "compare_run":
+    def cancellation_snapshot(self, claim, lane_ids):
+        with self.store.session() as s:
+            run = scoped(s, Run, claim["resource_id"], claim["project_id"])
+            lanes = s.execute(
+                select(Lane.id, Lane.cancel_requested_at, Lane.status).where(
+                    Lane.run_id == run.id, Lane.id.in_(lane_ids)
+                )
+            )
+            cancelled = {
+                lane_id
+                for lane_id, cancel_requested_at, status in lanes
+                if cancel_requested_at or status in TERMINAL
+            }
+            return bool(run.cancel_requested_at), cancelled
+
+    async def watch_lanes(self, claim, tasks):
+        while any(not task.done() for task in tasks.values()):
+            await asyncio.sleep(0.25)
+            run_cancelled, cancelled = await asyncio.to_thread(
+                self.cancellation_snapshot, claim, list(tasks)
+            )
+            for lane_id, task in tasks.items():
+                if run_cancelled or lane_id in cancelled:
                     task.cancel()
-                    return
-                self.store.heartbeat(claim["id"], claim["owner_token"])
-            except Problem:
-                task.cancel()
-                return
 
     async def run_once(self, job_id=None):
         await self.reconcile()
@@ -289,7 +294,14 @@ class Worker:
             await handler(claim)
 
         task = asyncio.create_task(owned_handler())
-        watcher = asyncio.create_task(self.watch(claim, task))
+        stopped = threading.Event()
+        lease = threading.Thread(
+            target=self.keep_lease,
+            args=(claim, task, asyncio.get_running_loop(), stopped),
+            name=f"job-lease-{claim['id']}",
+            daemon=True,
+        )
+        lease.start()
         error = None
         try:
             await task
@@ -307,8 +319,8 @@ class Worker:
                 )
             )
         finally:
-            watcher.cancel()
-            await asyncio.gather(watcher, return_exceptions=True)
+            stopped.set()
+            await asyncio.to_thread(lease.join, max(1, self.settings.heartbeat_seconds * 2))
         try:
             with self.store.session() as s:
                 job = self.store.owned(s, claim["id"], claim["owner_token"])
@@ -557,13 +569,17 @@ class Worker:
             queue_ms = max(0, (job.started_at - run.created_at).total_seconds() * 1000)
             question = run.question
         await writer.emit(None, "run.started", dict(lane_ids=[lane.id for lane in lanes], queue_ms=queue_ms))
-        tasks = [asyncio.create_task(self.lane(claim, writer, lane, question)) for lane in lanes]
+        tasks = {
+            lane.id: asyncio.create_task(self.lane(claim, writer, lane, question)) for lane in lanes
+        }
+        watcher = asyncio.create_task(self.watch_lanes(claim, tasks))
         try:
-            await asyncio.gather(*tasks)
+            await asyncio.gather(*tasks.values())
         finally:
-            for task in tasks:
+            watcher.cancel()
+            for task in tasks.values():
                 task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
+            await asyncio.gather(watcher, *tasks.values(), return_exceptions=True)
         with self.store.session() as s:
             states = list(s.scalars(select(Lane.status).where(Lane.run_id == claim["resource_id"])))
         status = (
@@ -586,15 +602,7 @@ class Worker:
             current = s.scalar(select(Lane).where(Lane.id == lane.id, Lane.run_id == claim["resource_id"]))
             if current.status in TERMINAL:
                 return
-        watcher = asyncio.create_task(self.watch_lane(claim, lane.id, asyncio.current_task()))
-
         async def emit(kind, payload):
-            if kind not in {"stage.failed", "lane.failed", "lane.cancelled", "lane.timed_out"}:
-                with self.store.session() as s:
-                    run = scoped(s, Run, claim["resource_id"], claim["project_id"])
-                    current = s.scalar(select(Lane).where(Lane.id == lane.id, Lane.run_id == run.id))
-                    if run.cancel_requested_at or current.cancel_requested_at:
-                        raise asyncio.CancelledError()
             await writer.emit(lane.id, kind, payload)
 
         try:
@@ -691,9 +699,6 @@ class Worker:
             except Problem as failure:
                 if failure.code not in {"WORKER_LOST", "LANE_TERMINAL", "RUN_TERMINAL"}:
                     raise
-        finally:
-            watcher.cancel()
-            await asyncio.gather(watcher, return_exceptions=True)
 
 
 async def serve(worker):

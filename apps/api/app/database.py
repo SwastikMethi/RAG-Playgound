@@ -150,7 +150,7 @@ class Store:
             job = self.owned(s, job_id, token)
             job.heartbeat_at = self.now(s)
             job.lease_expires_at = job.heartbeat_at + timedelta(seconds=self.lease_seconds)
-            return True
+            return bool(job.cancel_requested_at)
 
     def path(self, artifact):
         if self.artifacts:

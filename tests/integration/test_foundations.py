@@ -1,6 +1,7 @@
 """Catch cross-project access, duplicate job claims, and stale-owner writes."""
 
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
@@ -29,13 +30,60 @@ def test_claim_is_exclusive_and_old_owner_is_fenced():
     with ThreadPoolExecutor(max_workers=2) as pool:
         claims = list(pool.map(lambda _: store.claim(job_id), range(2)))
     claimed = [x for x in claims if x]
-    assert len(claimed) == 1
-    with pytest.raises(Problem, match="lease"):
-        store.heartbeat(job_id, "wrong-owner")
-    assert store.heartbeat(job_id, claimed[0]["owner_token"])
-    with store.session() as s:
-        s.get(Job, job_id).status = "succeeded"
-    store.engine.dispose()
+    try:
+        assert len(claimed) == 1
+        with pytest.raises(Problem, match="lease"):
+            store.heartbeat(job_id, "wrong-owner")
+        assert store.heartbeat(job_id, claimed[0]["owner_token"]) is False
+        with store.session() as s:
+            s.get(Job, job_id).cancel_requested_at = store.now(s)
+        assert store.heartbeat(job_id, claimed[0]["owner_token"]) is True
+    finally:
+        with store.session() as s:
+            saved = s.get(Job, job_id)
+            if saved:
+                saved.status = "succeeded"
+        store.engine.dispose()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_heartbeat_survives_a_blocked_event_loop(tmp_path):
+    from app.models import Job, Project
+    from app.settings import Settings
+    from tests.conftest import TEST_URL
+    from workers.main import Worker
+
+    worker = Worker(
+        Settings(mode="test", database_url=TEST_URL, artifact_root=tmp_path, _env_file=None)
+    )
+    worker.store.lease_seconds = 0.25
+    worker.settings.heartbeat_seconds = 0.05
+    with worker.store.session() as s:
+        project = Project(name="lease thread test")
+        s.add(project)
+        s.flush()
+        job = Job(project_id=project.id, kind="ingest_source", resource_id="blocked-handler")
+        s.add(job)
+        s.flush()
+        job_id = job.id
+
+    async def blocked_handler(_claim):
+        time.sleep(0.6)
+
+    worker.ingest = blocked_handler
+    try:
+        assert await worker.run_once(job_id)
+        with worker.store.session() as s:
+            saved = s.get(Job, job_id)
+            assert saved.status == "succeeded"
+            assert saved.heartbeat_at > saved.started_at
+    finally:
+        with worker.store.session() as s:
+            saved = s.get(Job, job_id)
+            if saved and saved.status == "running":
+                saved.status = "failed"
+        worker.close()
 
 
 def test_profile_secrets_are_not_public_and_fixture_is_explicit(tmp_path, monkeypatch):
