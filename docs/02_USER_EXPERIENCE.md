@@ -26,6 +26,8 @@ Setup is the only place to choose answer and embedding models. Show advanced ret
 
 Prepare is explicit. It first creates immutable replacement revisions for selected pipelines whose actual models or embedding dimensions differ from Setup, then prepares or reuses their bundles. Historical profile identifiers that resolve to the same models and dimensions do not force a revision or paid re-embedding. Show the actual preparation phases, time spent and whether an artifact was built or reused. Ask remains disabled until all selected configurations reflect Setup and have matching ready bundles. Preparation failures stay next to the affected technique.
 
+Preparation runs on an on-demand worker. While work is queued, explain that the worker may be starting after inactivity or finishing earlier work and that this can take about a minute. Replace that notice with the normal preparation progress as soon as processing begins; do not use a blocking application overlay.
+
 ### Comparison workspace
 
 The question applies to the frozen selected corpus and configurations. Submission clears the new run's output, preserves prior history, and opens its authorized event stream.
@@ -35,6 +37,8 @@ Every lane includes its name, technique, configuration badge, independent status
 At desktop widths show two or three comfortable columns; additional lanes scroll horizontally or use a two-row layout. At smaller widths use a lane switcher while keeping run status and question visible. Do not shrink six answers into unreadable narrow columns.
 
 The question bar displays only the shared answer-model name: the Setup selection before a run and the recorded model for an active or historical run. Context/output budgets remain in pipeline settings rather than this compact caption. The comparison header displays the corpus version and a notice that timing reflects this run. v1 enforces identical effective generation settings across lanes in one run. When users inspect separate historical runs with different settings, display those differences explicitly.
+
+A newly submitted comparison may remain queued while the on-demand worker starts or completes earlier work. Show the same localized, accessible explanation used by preparation until the first persisted execution event arrives. Once the run starts, show its recorded queue duration and normal live status. Historical and already-active runs must not be mislabeled as waiting for worker startup.
 
 ### Workflow and evidence
 
