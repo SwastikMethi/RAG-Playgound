@@ -663,7 +663,7 @@ export function Workspace({
                   <select
                     value={corpusId}
                     onChange={(e) => setCorpusId(e.target.value)}
-                    disabled={active}
+                    disabled={active || busy}
                   >
                     {!corpusId && (
                       <option value="">Choose source documents</option>
@@ -676,7 +676,7 @@ export function Workspace({
                   </select>
                 </label>
               </div>
-              <Button onClick={() => onView("sources")}>
+              <Button disabled={busy} onClick={() => onView("sources")}>
                 <BookOpen size={16} />
                 {corpus ? "Manage sources" : "Add sources"}
               </Button>
@@ -710,7 +710,7 @@ export function Workspace({
                   Different routes to the same evidence
                 </span>
               </summary>
-              {configs.length > 0 && <label>Use a saved configuration<select value="" disabled={active || selected.length >= 6} onChange={(e) => { if (e.target.value) setSelected((prior) => [...prior, e.target.value]); }}><option value="">Choose a saved revision…</option>{configs.map((c) => <option key={c.id} value={c.id} disabled={selected.includes(c.id)}>{c.name} · revision {c.revision}</option>)}</select></label>}
+              {configs.length > 0 && <label>Use a saved configuration<select value="" disabled={busy || active || selected.length >= 6} onChange={(e) => { if (e.target.value) setSelected((prior) => [...prior, e.target.value]); }}><option value="">Choose a saved revision…</option>{configs.map((c) => <option key={c.id} value={c.id} disabled={selected.includes(c.id)}>{c.name} · revision {c.revision}</option>)}</select></label>}
               {!modelsReady && <p className="caption">Check model access in Setup before adding a new pipeline.</p>}
               {busyTask === "technique" && <p className="caption"><Loading label="Adding technique" /> Adding technique…</p>}
               <div className="technique-grid">
@@ -748,6 +748,7 @@ export function Workspace({
                 {selectedConfigs.map((config) => (
                   <div key={config.id} className="lane-chip">
                     <button
+                      disabled={busy}
                       onClick={() =>
                         setInspection({ kind: "settings", config })
                       }
@@ -760,7 +761,7 @@ export function Workspace({
                     />
                     <Button
                       aria-label={`Remove ${config.name}`}
-                      disabled={active}
+                      disabled={busy || active}
                       onClick={() =>
                         setSelected((prior) =>
                           prior.filter((id) => id !== config.id),

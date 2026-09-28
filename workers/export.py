@@ -78,18 +78,73 @@ def profile_ids(config):
     return list(dict.fromkeys(ids))
 
 
+def profile_references(config):
+    references = [
+        dict(
+            role="generation",
+            profile_id=config["generation"]["profile_id"],
+            model=config["generation"].get("model"),
+            operation="generation",
+        )
+    ]
+    if config["embedding"]:
+        references.append(
+            dict(
+                role="embedding",
+                profile_id=config["embedding"]["profile_id"],
+                model=config["embedding"].get("model"),
+                operation="embedding",
+            )
+        )
+    if config["tree"]:
+        references.extend(
+            [
+                dict(
+                    role="tree_indexing",
+                    profile_id=config["tree"]["index_profile_id"],
+                    model=config["tree"].get("index_model"),
+                    operation="tree_indexing",
+                ),
+                dict(
+                    role="tree_selection",
+                    profile_id=config["tree"]["selection_profile_id"],
+                    model=config["tree"].get("selection_model"),
+                    operation="tree_selection",
+                ),
+            ]
+        )
+    return references
+
+
+def selected_profile(profiles, reference):
+    matches = [
+        profile
+        for profile in profiles
+        if profile["id"] == reference["profile_id"]
+        and profile["model"] == reference["model"]
+        and reference["operation"] in profile["operations"]
+    ]
+    if len(matches) != 1:
+        raise Problem(
+            "PROFILE_CHANGED",
+            "A recorded provider profile is unavailable or ambiguous.",
+            409,
+        )
+    return matches[0]
+
+
 def portable_configuration(config, profiles):
     config = deepcopy(config)
-    aliases = {id: f"provider-{i}" for i, id in enumerate(profile_ids(config), 1)}
-    for part in ("generation", "embedding"):
-        if config[part]:
-            config[part]["profile_id"] = aliases[config[part]["profile_id"]]
-    if config["tree"]:
-        for key in ("index_profile_id", "selection_profile_id"):
-            config["tree"][key] = aliases[config["tree"][key]]
     result = []
-    for id, alias in aliases.items():
-        p = deepcopy(profiles[id])
+    for i, reference in enumerate(profile_references(config), 1):
+        alias = f"provider-{i}"
+        if reference["role"] in {"generation", "embedding"}:
+            config[reference["role"]]["profile_id"] = alias
+        elif reference["role"] == "tree_indexing":
+            config["tree"]["index_profile_id"] = alias
+        else:
+            config["tree"]["selection_profile_id"] = alias
+        p = deepcopy(selected_profile(profiles, reference))
         p.update(id=alias, label=alias, api_key_env=alias.upper().replace("-", "_") + "_API_KEY")
         result.append(p)
     return config, result
@@ -310,10 +365,13 @@ async def export_lane(worker, claim):
         if recordings is None:
             raise Problem("REPLAY_UNAVAILABLE", "This lane has no complete boundary recording.")
         snapshot_profiles = snapshot_profiles or [p.model_dump() for p in claim["profiles"].values()]
-        profile_map = {p["id"]: p for p in snapshot_profiles}
-        snapshot_profiles = [profile_map[id] for id in profile_ids(lane.config_snapshot)]
-        profile_map = {p["id"]: p for p in snapshot_profiles}
-        config, portable_profiles = portable_configuration(lane.config_snapshot, profile_map)
+        selected_profiles = []
+        for reference in profile_references(lane.config_snapshot):
+            profile = selected_profile(snapshot_profiles, reference)
+            if profile not in selected_profiles:
+                selected_profiles.append(profile)
+        snapshot_profiles = selected_profiles
+        config, portable_profiles = portable_configuration(lane.config_snapshot, snapshot_profiles)
         corpus = scoped(s, Corpus, run.corpus_version_id, item.project_id)
 
         def check():
@@ -380,30 +438,32 @@ async def export_lane(worker, claim):
         if mode == "live":
             request["mode"] = "live"
             # Pass this owner's credentials only to this isolated verification process.
-            current_profiles = {}
-            for profile in snapshot_profiles:
+            current_profiles = []
+            for reference in profile_references(lane.config_snapshot):
+                profile = selected_profile(snapshot_profiles, reference)
                 current = resolve_profile(
                     claim["profiles"],
                     profile["id"],
                     profile["model"],
-                    profile["operations"][0],
+                    reference["operation"],
                 )
                 if current.fingerprint() != Profile.model_validate(profile).fingerprint():
                     raise Problem(
                         "PROFILE_CHANGED",
                         "A provider profile changed since this lane. Save and run a new revision.",
                     )
-                current_profiles[profile["id"]] = current
+                current_profiles.append(current)
             # Saved environment aliases may have changed; bind every replay profile explicitly.
             request["profiles"] = [
                 dict(profile, api_key_env=f"RAG_REPLAY_KEY_{i}")
-                for i, profile in enumerate(snapshot_profiles)
+                for i, profile in enumerate(portable_profiles)
             ]
+            request["config"] = config
             live = await run_json(
                 [str(folder / "scripts/verify.py")], input_data=request, root=folder, timeout=300,
                 env_extra={
-                    p["api_key_env"]: current_profiles[p["id"]].key
-                    for p in request["profiles"]
+                    p["api_key_env"]: current.key
+                    for p, current in zip(request["profiles"], current_profiles, strict=True)
                 },
             )
             manifest["verification"]["live_replay"] = dict(

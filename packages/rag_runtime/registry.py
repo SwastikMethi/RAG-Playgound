@@ -147,7 +147,7 @@ def config_profiles(config: dict, profiles: dict, require_available: bool = True
             ),
         ]
     return {
-        field["profile_id"]: resolve_profile(
+        operation: resolve_profile(
             profiles, field["profile_id"], field["model"], operation, require_available
         )
         for field, operation in fields

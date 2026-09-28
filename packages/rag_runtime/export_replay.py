@@ -73,11 +73,19 @@ def evidence_identity(items):
     ]
 
 
+def replay_profiles(raw_profiles, cls):
+    profiles = {}
+    for i, raw in enumerate(raw_profiles):
+        key = raw["id"] if raw["id"] not in profiles else f"{raw['id']}:{i}"
+        profiles[key] = cls.model_validate(raw)
+    return profiles
+
+
 async def verify_replay(request):
     offline = request["mode"] == "offline"
     config, prepared = request["config"], request["prepared"]
     cls = RecordedProfile if offline else Profile
-    profiles = {raw["id"]: cls.model_validate(raw) for raw in request["profiles"]}
+    profiles = replay_profiles(request["profiles"], cls)
     gateway = RecordedGateway(request["recordings"]) if offline else Gateway()
     vector_store = VectorStore(":memory:") if config["embedding"] else None
     try:

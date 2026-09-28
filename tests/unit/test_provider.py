@@ -99,11 +99,11 @@ def test_historical_profile_ids_resolve_new_models_and_keep_production_bundle_ha
         3072,
     )
     assert {
-        profile_id: profile.model
-        for profile_id, profile in config_profiles(config, profiles, False).items()
+        operation: profile.model
+        for operation, profile in config_profiles(config, profiles, False).items()
     } == {
-        "openai-answer": "gpt-6-luna",
-        "openai-embedding": "text-embedding-3-large",
+        "generation": "gpt-6-luna",
+        "embedding": "text-embedding-3-large",
     }
     check_config(config, profiles, require_available=False, require_local_adapters=False)
     assert preparation_identity(
@@ -159,6 +159,75 @@ def test_historical_profile_alias_rejects_unknown_ambiguous_and_cross_provider_m
             "generation",
             False,
         )
+
+
+def test_config_profiles_keeps_distinct_models_that_share_a_historical_id():
+    from rag_runtime.registry import config_profiles
+
+    historical = Profile(
+        id="answer",
+        label="Historical",
+        model="old",
+        operations=["generation", "tree_indexing", "tree_selection"],
+        kind="fixture",
+        max_output_tokens=512,
+        tokenizer="cl100k_base",
+    )
+    profiles = {
+        "answer": historical,
+        "generation": historical.model_copy(
+            update={"id": "generation", "model": "luna", "operations": ["generation"]}
+        ),
+        "index": historical.model_copy(
+            update={"id": "index", "model": "sol", "operations": ["tree_indexing"]}
+        ),
+        "selection": historical.model_copy(
+            update={"id": "selection", "model": "astra", "operations": ["tree_selection"]}
+        ),
+    }
+    config = {
+        "generation": {"profile_id": "answer", "model": "luna"},
+        "embedding": None,
+        "tree": {
+            "index_profile_id": "answer",
+            "index_model": "sol",
+            "selection_profile_id": "answer",
+            "selection_model": "astra",
+        },
+    }
+
+    resolved = config_profiles(config, profiles, False)
+
+    assert set(resolved) == {"generation", "tree_indexing", "tree_selection"}
+    assert {profile.model for profile in resolved.values()} == {"luna", "sol", "astra"}
+
+
+def test_export_replay_indexes_duplicate_historical_ids_without_collapsing_models():
+    from rag_runtime.export_replay import replay_profiles
+    from rag_runtime.registry import resolve_profile
+
+    snapshots = [
+        Profile(
+            id="answer",
+            label=model,
+            model=model,
+            operations=[operation],
+            kind="fixture",
+            max_output_tokens=512,
+            tokenizer="cl100k_base",
+        ).model_dump()
+        for model, operation in (
+            ("luna", "generation"),
+            ("sol", "tree_indexing"),
+            ("astra", "tree_selection"),
+        )
+    ]
+
+    profiles = replay_profiles(snapshots, Profile)
+
+    assert resolve_profile(profiles, "answer", "luna", "generation").model == "luna"
+    assert resolve_profile(profiles, "answer", "sol", "tree_indexing").model == "sol"
+    assert resolve_profile(profiles, "answer", "astra", "tree_selection").model == "astra"
 
 
 def test_generation_comparison_treats_only_compatible_profile_aliases_as_equal():

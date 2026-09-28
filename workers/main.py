@@ -639,18 +639,15 @@ class Worker:
                     canonical(result["recordings"]),
                     dict(lane_id=lane.id, run_id=claim["resource_id"]),
                 )
+                resolved_profiles = {
+                    profile.fingerprint(): profile
+                    for profile in config_profiles(lane.config_snapshot, claim["profiles"]).values()
+                }
                 profile_artifact = self.store.put(
                     s,
                     claim["project_id"],
                     "provider_profiles",
-                    canonical(
-                        [
-                            p.model_dump()
-                            for p in config_profiles(
-                                lane.config_snapshot, claim["profiles"]
-                            ).values()
-                        ]
-                    ),
+                    canonical([profile.model_dump() for profile in resolved_profiles.values()]),
                     dict(lane_id=lane.id, run_id=claim["resource_id"]),
                 )
                 saved.provenance = dict(

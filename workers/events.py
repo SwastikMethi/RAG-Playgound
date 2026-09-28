@@ -24,6 +24,17 @@ def persist_event(s, store, run, lane_id, kind, payload, elapsed):
     )
     if lane_id and (not lane or lane.status in TERMINAL):
         raise Problem("LANE_TERMINAL", "This lane has already finished.", 409)
+    closing = {
+        "stage.failed",
+        "lane.failed",
+        "lane.cancelled",
+        "lane.timed_out",
+        "run.failed",
+        "run.partial",
+        "run.cancelled",
+    }
+    if kind not in closing and (run.cancel_requested_at or (lane and lane.cancel_requested_at)):
+        raise asyncio.CancelledError
     now = store.now(s)
     event = dict(
         schema_version="1.0.0",

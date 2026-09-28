@@ -42,12 +42,15 @@ test("upload, prepare, answer, inspect evidence and replay", async ({
   await expect(page.locator(".question-box .caption")).toHaveText("fixture-answer-v1");
   await expect(page.locator(".question-box .caption")).not.toContainText("context tokens");
   await page.route("**/api/v1/projects/*/preparations", async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    await new Promise((resolve) => setTimeout(resolve, 1500));
     await route.continue();
   }, { times: 1 });
   await page.getByRole("button", { name: "Prepare selected" }).click();
   await expect(page.locator(".setup-bar .button").last()).toHaveAttribute("aria-busy", "true");
   await expect(page.locator(".setup-bar .button").last()).toBeDisabled();
+  await expect(page.getByLabel("CORPUS")).toBeDisabled();
+  await expect(page.getByLabel("Use a saved configuration")).toBeDisabled();
+  await expect(page.locator('.lane-chip button[aria-label^="Remove"]')).toBeDisabled();
   await expect(
     page.getByText("Starting the on-demand worker or waiting for earlier work", {
       exact: false,

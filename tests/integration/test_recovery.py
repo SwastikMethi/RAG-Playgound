@@ -100,11 +100,8 @@ async def test_five_lanes_share_one_cancellation_poll_and_cancel_independently(c
         cancelled = saved["lanes"][0]["id"]
         response = client.post(f"/api/v1/runs/{run['id']}/lanes/{cancelled}/cancel")
         assert response.status_code == 202, response.text
-        for _ in range(150):
-            saved = client.get("/api/v1/runs/" + run["id"]).json()
-            if next(lane for lane in saved["lanes"] if lane["id"] == cancelled)["status"] == "cancelled":
-                break
-            await asyncio.sleep(0.02)
+        # The provider may finish before the shared cancellation watcher polls again.
+        # The transactional event writer must still reject successful completion.
         release.set()
         await asyncio.wait_for(task, 5)
         saved = client.get("/api/v1/runs/" + run["id"]).json()

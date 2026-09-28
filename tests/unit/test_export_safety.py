@@ -16,6 +16,34 @@ def test_export_uses_only_profiles_referenced_by_the_lane():
     assert export.profile_ids(config) == ["answer", "embedding"]
 
 
+def test_pageindex_export_keeps_distinct_models_with_one_historical_profile_id():
+    config = {
+        "generation": {"profile_id": "answer", "model": "luna"},
+        "embedding": None,
+        "tree": {
+            "index_profile_id": "answer",
+            "index_model": "sol",
+            "selection_profile_id": "answer",
+            "selection_model": "astra",
+        },
+    }
+    snapshots = [
+        {"id": "answer", "model": model, "operations": [operation], "label": model}
+        for model, operation in (
+            ("luna", "generation"),
+            ("sol", "tree_indexing"),
+            ("astra", "tree_selection"),
+        )
+    ]
+
+    portable, profiles = export.portable_configuration(config, snapshots)
+
+    assert portable["generation"]["profile_id"] == "provider-1"
+    assert portable["tree"]["index_profile_id"] == "provider-2"
+    assert portable["tree"]["selection_profile_id"] == "provider-3"
+    assert [profile["model"] for profile in profiles] == ["luna", "sol", "astra"]
+
+
 @pytest.mark.parametrize(
     ("technique", "source_format", "required", "excluded"),
     [
