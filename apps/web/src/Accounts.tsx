@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { FlaskConical } from "lucide-react";
 import { api, post, setCSRF } from "./api";
 import type { components } from "./generated/api";
-import { Button, ErrorNotice } from "./ui";
+import { Button, ErrorNotice, Loading } from "./ui";
 import { ThemeToggle } from "./ThemeToggle";
 
 export type CurrentAccount = components["schemas"]["CurrentAccount"];
@@ -49,7 +49,7 @@ export function AccountGate({ children }: { children: (account: CurrentAccount) 
     }).catch(e => setError(e.message));
   }, []);
   if (error) return <main className="auth-shell"><ErrorNotice message={error} /><Button onClick={() => location.reload()}>Try again</Button></main>;
-  if (!account) return <main className="auth-shell" role="status">Opening your workspace…</main>;
+  if (!account) return <main className="auth-shell" role="status"><Loading label="Opening workspace" /> Opening your workspace…</main>;
   if (["/login", "/signup", "/recover"].includes(location.pathname)) return <AuthScreen account={account} />;
   return children(account);
 }
@@ -98,7 +98,7 @@ function AuthScreen({ account }: { account: CurrentAccount }) {
           <label>{action === "recover" ? "New password" : "Password"}<input type="password" autoComplete={action === "login" ? "current-password" : "new-password"} required minLength={action === "login" ? 1 : 15} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} /></label>
           {action !== "login" && <p className="caption">Use a passphrase of 15–128 characters.</p>}
           <Challenge siteKey={account.turnstile_site_key || ""} action={action} onToken={setToken} attempt={attempt} />
-          <Button tone="primary" type="submit" disabled={busy || !token}>{busy ? "Please wait…" : action === "register" ? "Create account" : action === "recover" ? "Reset password" : "Sign in"}</Button>
+          <Button tone="primary" type="submit" loading={busy} disabled={busy || !token}>{action === "register" ? "Create account" : action === "recover" ? "Reset password" : "Sign in"}</Button>
         </form>
         <nav className="auth-links" aria-label="Account access">
           {action !== "login" && <a href="/login">Sign in</a>}
@@ -116,26 +116,26 @@ export function AccountSettings({ onKeyChanged }: { onKeyChanged: () => void }) 
   const [configured, setConfigured] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState("");
   const [current, setCurrent] = useState("");
   const [password, setPassword] = useState("");
   useEffect(() => { api<{configured:boolean}>("/me/openai-key").then(v => setConfigured(v.configured)).catch(e => setError(e.message)); }, []);
   async function changeKey(remove = false) {
-    setBusy(true); setError(""); setMessage("");
+    setBusy(remove ? "remove-key" : "save-key"); setError(""); setMessage("");
     try {
       await api("/me/openai-key", {method: remove ? "DELETE" : "PUT", ...(remove ? {} : {body: JSON.stringify({api_key:key})})});
       setKey(""); setConfigured(!remove); onKeyChanged();
       setMessage(remove ? "Key removed. New model jobs need a key." : "Key saved securely. Model access is checked when you prepare or ask a question.");
     } catch (e) { setError((e as Error).message); }
-    finally { setBusy(false); }
+    finally { setBusy(""); }
   }
   async function changePassword(e: React.FormEvent) {
-    e.preventDefault(); setBusy(true); setError(""); setMessage("");
+    e.preventDefault(); setBusy("password"); setError(""); setMessage("");
     try {
       const result = await post<Session>("/auth/password", {current_password:current, password});
       setCSRF(result.csrf_token); setCurrent(""); setPassword(""); setMessage("Password changed. Other sessions have been signed out.");
     } catch (e) { setError((e as Error).message); }
-    finally { setBusy(false); }
+    finally { setBusy(""); }
   }
   return <section className="account-settings">
     <h2>Your OpenAI key</h2>
@@ -143,14 +143,14 @@ export function AccountSettings({ onKeyChanged }: { onKeyChanged: () => void }) 
     {error && <ErrorNotice message={error} />}{message && <p role="status">{message}</p>}
     <form className="account-form" onSubmit={e => {e.preventDefault(); void changeKey();}}>
       <label>OpenAI API key<input type="password" autoComplete="off" spellCheck={false} required minLength={10} maxLength={512} value={key} onChange={e => setKey(e.target.value)} /></label>
-      <div className="account-actions"><Button tone="primary" type="submit" disabled={busy}>{configured ? "Replace key" : "Save key"}</Button>{configured && <Button type="button" disabled={busy} onClick={() => void changeKey(true)}>Remove key</Button>}</div>
+      <div className="account-actions"><Button tone="primary" type="submit" loading={busy === "save-key"} disabled={!!busy}>{configured ? "Replace key" : "Save key"}</Button>{configured && <Button type="button" loading={busy === "remove-key"} disabled={!!busy} onClick={() => void changeKey(true)}>Remove key</Button>}</div>
     </form>
     <p className="caption">Changes apply when a job starts. Already-running provider requests may still be billed. Revoke a compromised key in your OpenAI account.</p>
     <details className="password-settings"><summary>Change password</summary>
       <form className="account-form" onSubmit={changePassword}>
         <label>Current password<input type="password" autoComplete="current-password" required maxLength={128} value={current} onChange={e => setCurrent(e.target.value)} /></label>
         <label>New password<input type="password" autoComplete="new-password" required minLength={15} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} /></label>
-        <Button type="submit" disabled={busy}>Update password</Button>
+        <Button type="submit" loading={busy === "password"} disabled={!!busy}>Update password</Button>
       </form>
     </details>
   </section>;

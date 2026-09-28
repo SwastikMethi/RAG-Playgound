@@ -22,6 +22,8 @@ Define shared tokens and reusable components before building individual screens.
 | Numeric values | Align comparable values, use consistent units and tabular numerals where available. Use an em dash plus an explanation for unavailable values, never a fabricated zero. |
 | Motion | Brief, purposeful transitions, ordinarily 120–200 ms for interface changes. Keep execution graphs stable. Reduced motion retains every status and result without requiring animated movement. |
 
+Long-running controls show a localized accessible spinner and remain disabled until their action settles. Queued, processing, preparing, running and building records show an active status indicator. Do not cover the workspace with a blocking global loading overlay; reduced-motion mode keeps the same labels and static indicators without animation.
+
 Avoid decorative gradients, glass effects, neon glows, unnecessary animated backgrounds, emoji navigation, oversized pill badges, repeated card grids, or unrelated illustrations in the core workspace. Do not copy a component-library example wholesale and call the design complete. Status badges, cards and animation are appropriate when they convey a specific state or relationship.
 
 Light appearance is the initial visual baseline. Dark appearance is optional and must meet the same readability requirements if implemented; a theme toggle is not a v1 release requirement.

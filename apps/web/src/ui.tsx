@@ -10,19 +10,31 @@ import { X } from "lucide-react";
 export function Button({
   children,
   tone = "neutral",
+  loading = false,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   tone?: "primary" | "neutral" | "danger";
+  loading?: boolean;
 }) {
   return (
-    <button {...props} className={`button ${tone} ${props.className || ""}`}>
+    <button
+      {...props}
+      disabled={loading || props.disabled}
+      aria-busy={loading || undefined}
+      className={`button ${tone} ${props.className || ""}`}
+    >
+      {loading && <Loading />}
       {children}
     </button>
   );
 }
+export function Loading({ label = "Loading" }: { label?: string }) {
+  return <span className="loading-indicator" role="status" aria-label={label} />;
+}
 export function Status({ value }: { value: string }) {
+  const active = ["queued", "processing", "preparing", "running", "building"].includes(value);
   return (
-    <span className={`status ${value}`}>
+    <span className={`status ${value}`} aria-busy={active || undefined}>
       <span aria-hidden="true" />
       {value.replaceAll("_", " ")}
     </span>

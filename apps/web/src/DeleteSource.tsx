@@ -28,7 +28,7 @@ export function DeleteSource({ source, onDeleted }: { source: Source; onDeleted:
     {!!impact?.active_job_ids.length && <ErrorNotice message="Stop active source, preparation, comparison or export jobs before deleting. Close and reopen this panel to refresh the impact." />}
     <label className="inline-check"><input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} disabled={busy} /> Delete this source and all listed dependent content</label>
     {error && <ErrorNotice message={error} />}
-    <div className="form-actions"><Button tone="danger" onClick={remove} disabled={!confirmed || !impact || !!impact.active_job_ids.length || busy}>{busy ? "Removing source content…" : source.status === "deleting" ? "Retry cleanup" : "Delete source permanently"}</Button></div>
+    <div className="form-actions"><Button tone="danger" loading={busy} onClick={remove} disabled={!confirmed || !impact || !!impact.active_job_ids.length || busy}>{source.status === "deleting" ? "Retry cleanup" : "Delete source permanently"}</Button></div>
     <p className="caption" role="status">{busy ? "Confirmed cleanup continues if this panel is closed." : ""}</p>
   </>;
 }

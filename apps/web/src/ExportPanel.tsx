@@ -44,8 +44,8 @@ export function ExportPanel({ runId, lane, fixture }: { runId: string; lane: Lan
     <p className="caption">{fixture ? "This saved run uses fixture responses. Live verification is available for live runs." : live ? "This makes a new answer-model call, a query embedding for vector techniques, and up to the saved tree call budget for PageIndex. It reuses the prepared source index. Provider charges may apply; future answers can differ." : "Offline replay uses recorded external responses. It makes no new model calls and does not verify live provider performance."}</p>
     {error && <ErrorNotice message={error} />}
     {item?.error && <ErrorNotice message={item.error.message} />}
-    <div className="form-actions"><Button tone="primary" disabled={working} onClick={build}>{working ? "Building export…" : "Build export"}</Button>
-      {item?.download_url && <Button disabled={busy} onClick={download}>Download ZIP</Button>}
+    <div className="form-actions"><Button tone="primary" loading={working} disabled={working} onClick={build}>Build export</Button>
+      {item?.download_url && <Button loading={busy} disabled={busy} onClick={download}>Download ZIP</Button>}
       {item?.job_id && ["queued", "building"].includes(item.status) && <Button tone="danger" onClick={() => post(`/jobs/${item.job_id}/cancel`, undefined).catch((e) => setError(e.message))}>Cancel build</Button>}
     </div>
     {item && <div role="status"><Status value={item.status} /></div>}

@@ -33,7 +33,7 @@ from rag_runtime.contracts import canonical, digest
 from rag_runtime.errors import Problem
 from rag_runtime.operational import log_event
 from rag_runtime.providers import Gateway, empty_usage, load_profiles
-from rag_runtime.registry import check_config, preparation_identity
+from rag_runtime.registry import check_config, config_profiles, preparation_identity
 from rag_runtime.runtime import execute
 from rag_runtime.process import run_json
 from rag_runtime.trace import empty_timing
@@ -635,7 +635,14 @@ class Worker:
                     s,
                     claim["project_id"],
                     "provider_profiles",
-                    canonical([p.model_dump() for p in claim["profiles"].values()]),
+                    canonical(
+                        [
+                            p.model_dump()
+                            for p in config_profiles(
+                                lane.config_snapshot, claim["profiles"]
+                            ).values()
+                        ]
+                    ),
                     dict(lane_id=lane.id, run_id=claim["resource_id"]),
                 )
                 saved.provenance = dict(

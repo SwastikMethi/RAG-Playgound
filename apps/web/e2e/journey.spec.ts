@@ -39,10 +39,22 @@ test("upload, prepare, answer, inspect evidence and replay", async ({
   ).toBeEnabled({ timeout: 20000 });
   await page.getByRole("button", { name: "Use selected sources" }).click();
   await page.getByRole("button", { name: /Keyword · BM25/ }).click();
+  await expect(page.locator(".question-box .caption")).toHaveText("fixture-answer-v1");
+  await expect(page.locator(".question-box .caption")).not.toContainText("context tokens");
+  await page.route("**/api/v1/projects/*/preparations", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    await route.continue();
+  }, { times: 1 });
   await page.getByRole("button", { name: "Prepare selected" }).click();
+  await expect(page.locator(".setup-bar .button").last()).toHaveAttribute("aria-busy", "true");
+  await expect(page.locator(".setup-bar .button").last()).toBeDisabled();
   await expect(page.getByText("Ready to compare", { exact: true })).toBeVisible(
     { timeout: 20000 },
   );
+  await page.locator(".lane-chip > button").first().click();
+  const settings = page.getByRole("complementary", { name: "Pipeline settings" });
+  await expect(settings.getByLabel(/model/i)).toHaveCount(0);
+  await page.getByRole("button", { name: "Close inspector" }).click();
   await page
     .getByLabel("Question for all selected lanes")
     .fill("What does NEBULA-42 mean?");
@@ -54,6 +66,8 @@ test("upload, prepare, answer, inspect evidence and replay", async ({
   await expect(
     page.getByText("Saved comparison", { exact: false }),
   ).toBeVisible();
+  await expect(page.locator(".question-box .caption")).toHaveText("fixture-answer-v1");
+  await expect(page.locator(".question-box .caption")).not.toContainText("context tokens");
   await expect(page.locator(".answer-text script, .answer-text img, .answer-text a")).toHaveCount(0);
   expect(await page.evaluate(() => Reflect.get(window, "injected"))).toBeUndefined();
   expect(externalRequests).toEqual([]);

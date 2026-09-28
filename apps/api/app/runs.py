@@ -12,7 +12,7 @@ from rag_runtime.context import GROUNDING
 from rag_runtime.contracts import digest, request as check_request, validate
 from rag_runtime.errors import Problem
 from rag_runtime.providers import empty_usage
-from rag_runtime.registry import check_config, preparation_identity
+from rag_runtime.registry import check_config, preparation_identity, resolve_profile
 from rag_runtime.trace import empty_timing
 from .content import idempotent, remember
 from .database import scoped
@@ -37,6 +37,16 @@ router = APIRouter(prefix="/api/v1")
 TERMINAL = {"completed", "partial", "failed", "cancelled", "timed_out"}
 
 
+def generation_identity(generation, profiles):
+    profile = resolve_profile(
+        profiles, generation["profile_id"], generation["model"], "generation", False
+    )
+    return (
+        {key: value for key, value in generation.items() if key != "profile_id"},
+        profile.model_dump(exclude={"id", "label"}),
+    )
+
+
 def lane_in_run(s, run_id, lane_id):
     run = scoped(s, Run, run_id)
     lane = s.scalar(select(Lane).where(Lane.id == lane_id, Lane.run_id == run.id))
@@ -48,10 +58,32 @@ def lane_in_run(s, run_id, lane_id):
 def provenance(s, corpus, bundle, config, profiles):
     gen, emb, tree = config["generation"], config["embedding"], config["tree"]
     fingerprints = dict(
-        generation=profiles[gen["profile_id"]].fingerprint(),
-        embedding=profiles[emb["profile_id"]].fingerprint() if emb else None,
-        tree_indexing=profiles[tree["index_profile_id"]].fingerprint() if tree else None,
-        tree_selection=profiles[tree["selection_profile_id"]].fingerprint() if tree else None,
+        generation=resolve_profile(
+            profiles, gen["profile_id"], gen["model"], "generation", False
+        ).fingerprint(),
+        embedding=resolve_profile(
+            profiles, emb["profile_id"], emb["model"], "embedding", False
+        ).fingerprint()
+        if emb
+        else None,
+        tree_indexing=resolve_profile(
+            profiles,
+            tree["index_profile_id"],
+            tree["index_model"],
+            "tree_indexing",
+            False,
+        ).fingerprint()
+        if tree
+        else None,
+        tree_selection=resolve_profile(
+            profiles,
+            tree["selection_profile_id"],
+            tree["selection_model"],
+            "tree_selection",
+            False,
+        ).fingerprint()
+        if tree
+        else None,
     )
     sources = s.scalars(
         select(Source)
@@ -121,13 +153,16 @@ def create_run(project_id: str, body: dict, request: Request, idempotency_key: s
                     409,
                 )
             generation = config.config["generation"]
-            if common is not None and generation != common:
+            identity = generation_identity(generation, profiles)
+            if common is not None and identity != common:
                 raise Problem(
                     "GENERATION_MISMATCH",
                     "Align generation settings across lanes for a controlled comparison.",
                 )
-            common = generation
-            p = profiles[generation["profile_id"]]
+            common = identity
+            p = resolve_profile(
+                profiles, generation["profile_id"], generation["model"], "generation"
+            )
             if (
                 token_count(GROUNDING + body["question"], p.tokenizer)
                 + generation["context_budget_tokens"]

@@ -32,6 +32,168 @@ def test_owner_profile_ids_keep_preexisting_saved_configurations_valid():
     check_config(config, profiles, require_available=False, require_local_adapters=False)
 
 
+def test_historical_profile_ids_resolve_new_models_and_keep_production_bundle_hash():
+    from app.settings import Settings
+    from rag_runtime.providers import load_profiles
+    from rag_runtime.registry import (
+        check_config,
+        config_profiles,
+        preparation_identity,
+        resolve_profile,
+    )
+
+    profiles = load_profiles(
+        Settings(
+            mode="live",
+            profiles_path=Path(__file__).parents[2] / "config/profiles.yaml",
+            _env_file=None,
+        )
+    )
+    config = {
+        "schema_version": "1.0.0",
+        "technique": "dense",
+        "chunking": {
+            "strategy": "fixed_tokens",
+            "size_tokens": 512,
+            "overlap_tokens": 64,
+            "tokenizer": "cl100k_base",
+            "tokenizer_revision": "0.14.0",
+        },
+        "embedding": {
+            "profile_id": "openai-embedding",
+            "model": "text-embedding-3-large",
+            "dimensions": 3072,
+            "document_prefix": "",
+            "query_prefix": "",
+        },
+        "search": {
+            "candidate_k": 20,
+            "context_k": 5,
+            "bm25": None,
+            "dense": {"metric": "cosine", "mode": "exact", "hnsw_ef": None, "min_score": None},
+            "rrf": None,
+        },
+        "reranker": None,
+        "parent": None,
+        "tree": None,
+        "generation": {
+            "profile_id": "openai-answer",
+            "model": "gpt-6-luna",
+            "temperature": 0,
+            "max_output_tokens": 512,
+            "context_budget_tokens": 3000,
+            "prompt_id": "grounded_answer_v1",
+            "seed": None,
+        },
+        "limits": {"lane_timeout_ms": 90000},
+    }
+
+    answer = resolve_profile(profiles, "openai-answer", "gpt-6-luna", "generation", False)
+    embedding = resolve_profile(
+        profiles, "openai-embedding", "text-embedding-3-large", "embedding", False
+    )
+    assert (answer.id, answer.model) == ("openai-answer", "gpt-6-luna")
+    assert (embedding.id, embedding.model, embedding.dimensions) == (
+        "openai-embedding",
+        "text-embedding-3-large",
+        3072,
+    )
+    assert {
+        profile_id: profile.model
+        for profile_id, profile in config_profiles(config, profiles, False).items()
+    } == {
+        "openai-answer": "gpt-6-luna",
+        "openai-embedding": "text-embedding-3-large",
+    }
+    check_config(config, profiles, require_available=False, require_local_adapters=False)
+    assert preparation_identity(
+        config,
+        "84e7b529d9f51a8b065579dce6a1bced3eabf025e81c8652bad43b8456c819b6",
+        profiles,
+    ) == "4b6f51555d4638fa6625cb44a7b9e8e88c1b10101150f77a91513e176623e6d2"
+
+
+def test_historical_profile_alias_rejects_unknown_ambiguous_and_cross_provider_matches():
+    from rag_runtime.registry import resolve_profile
+
+    historical = Profile(
+        id="historical",
+        label="Historical",
+        model="old",
+        operations=["generation"],
+        kind="fixture",
+        max_output_tokens=512,
+        tokenizer="cl100k_base",
+    )
+    compatible = historical.model_copy(update={"id": "new", "model": "new"})
+
+    exact = historical.model_copy(update={"model": "new"})
+    assert resolve_profile(
+        {"historical": exact, "duplicate": compatible},
+        "historical",
+        "new",
+        "generation",
+        False,
+    ) is exact
+
+    with pytest.raises(Problem, match="unavailable or has changed"):
+        resolve_profile({"historical": historical}, "missing", "new", "generation", False)
+    with pytest.raises(Problem, match="unavailable or has changed"):
+        resolve_profile(
+            {"historical": historical, "one": compatible, "two": compatible.model_copy(update={"id": "two"})},
+            "historical",
+            "new",
+            "generation",
+            False,
+        )
+    with pytest.raises(Problem, match="unavailable or has changed"):
+        resolve_profile(
+            {
+                "historical": historical,
+                "new": compatible.model_copy(
+                    update={"kind": "openai", "base_url": "https://api.openai.com/v1"}
+                ),
+            },
+            "historical",
+            "new",
+            "generation",
+            False,
+        )
+
+
+def test_generation_comparison_treats_only_compatible_profile_aliases_as_equal():
+    from app.runs import generation_identity
+
+    historical = Profile(
+        id="historical",
+        label="Historical",
+        model="old",
+        operations=["generation"],
+        kind="fixture",
+        max_output_tokens=512,
+        tokenizer="cl100k_base",
+    )
+    current = historical.model_copy(update={"id": "current", "model": "new"})
+    other_provider = current.model_copy(update={"id": "other", "kind": "openai"})
+    profiles = {profile.id: profile for profile in (historical, current, other_provider)}
+    generation = {
+        "profile_id": "historical",
+        "model": "new",
+        "temperature": 0,
+        "max_output_tokens": 512,
+        "context_budget_tokens": 3000,
+        "prompt_id": "grounded_answer_v1",
+        "seed": None,
+    }
+
+    assert generation_identity(generation, profiles) == generation_identity(
+        {**generation, "profile_id": "current"}, profiles
+    )
+    assert generation_identity(generation, profiles) != generation_identity(
+        {**generation, "profile_id": "other"}, profiles
+    )
+
+
 @pytest.mark.asyncio
 async def test_provider_retries_before_text_but_never_after_partial_answer(monkeypatch):
     from rag_runtime.providers import Gateway

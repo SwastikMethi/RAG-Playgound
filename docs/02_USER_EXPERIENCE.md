@@ -22,9 +22,9 @@ Present six selectable cards with status: compatible, needs preparation, prepari
 
 Default to dense and hybrid_rerank when their dependencies are configured. Otherwise default to BM25 and explain what additional configuration is needed. The same technique can be added twice with different saved settings and distinct lane names.
 
-Show advanced settings in a drawer with effective defaults, units, limits and a reset action. Save creates a new revision. Changing only retrieval or generation settings should reuse compatible source/index artifacts; changing chunking or embeddings must prepare affected artifacts.
+Setup is the only place to choose answer and embedding models. Show advanced retrieval and generation tuning in a pipeline drawer with effective defaults, units, limits and a reset action, but no model selectors. Save creates a new revision using the current Setup models. Changing only retrieval or generation settings should reuse compatible source/index artifacts; changing chunking or embeddings must prepare affected artifacts.
 
-Prepare is explicit. Show the actual preparation phases, time spent and whether an artifact was built or reused. Ask remains disabled until all selected configurations have matching ready bundles. Preparation failures stay next to the affected technique.
+Prepare is explicit. It first creates immutable replacement revisions for selected pipelines whose actual models or embedding dimensions differ from Setup, then prepares or reuses their bundles. Historical profile identifiers that resolve to the same models and dimensions do not force a revision or paid re-embedding. Show the actual preparation phases, time spent and whether an artifact was built or reused. Ask remains disabled until all selected configurations reflect Setup and have matching ready bundles. Preparation failures stay next to the affected technique.
 
 ### Comparison workspace
 
@@ -34,7 +34,7 @@ Every lane includes its name, technique, configuration badge, independent status
 
 At desktop widths show two or three comfortable columns; additional lanes scroll horizontally or use a two-row layout. At smaller widths use a lane switcher while keeping run status and question visible. Do not shrink six answers into unreadable narrow columns.
 
-The comparison header displays the shared answer model, context/output budgets, corpus version and a notice that timing reflects this run. v1 enforces identical effective generation settings across lanes in one run. When users inspect separate historical runs with different settings, display those differences explicitly.
+The question bar displays only the shared answer-model name: the Setup selection before a run and the recorded model for an active or historical run. Context/output budgets remain in pipeline settings rather than this compact caption. The comparison header displays the corpus version and a notice that timing reflects this run. v1 enforces identical effective generation settings across lanes in one run. When users inspect separate historical runs with different settings, display those differences explicitly.
 
 ### Workflow and evidence
 

@@ -19,6 +19,8 @@ Every test has observable pass conditions. Record failures and unperformed exter
 | A07 | Change embedding identity/dimension | New or rejected preparation; no incompatible artifact reuse |
 | A08 | Ask while a selected bundle is unready | API rejects before a compare job or query timer starts |
 | A09 | Submit one question to four lanes | All lanes start independently; same frozen corpus and shared generation settings |
+| A09a | Change Setup models with saved pipelines selected | Prepare creates only the required immutable revisions, reuses compatible bundles, and Ask stays disabled until every selected revision is ready |
+| A09b | Inspect pipeline settings and the question bar | Model selectors exist only in Setup; the caption shows the selected or recorded answer model without a context-token count |
 | A10 | Click an answer citation | Exact supplied evidence and original source location open |
 | A11 | Ask an unsupported question | No fabricated source IDs; insufficient evidence is visible |
 | A12 | Give feedback and rerun | Feedback persists; rerun has new identity and linked parent |

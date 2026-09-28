@@ -6,6 +6,16 @@ from rag_runtime.errors import Problem
 from workers import export
 
 
+def test_export_uses_only_profiles_referenced_by_the_lane():
+    config = {
+        "generation": {"profile_id": "answer"},
+        "embedding": {"profile_id": "embedding"},
+        "tree": None,
+    }
+
+    assert export.profile_ids(config) == ["answer", "embedding"]
+
+
 @pytest.mark.parametrize(
     ("technique", "source_format", "required", "excluded"),
     [

@@ -8,7 +8,7 @@ import {
   type Capability,
   type Project,
 } from "./api";
-import { Button, Empty, ErrorNotice } from "./ui";
+import { Button, Empty, ErrorNotice, Loading } from "./ui";
 import "./styles.css";
 import { Workspace } from "./Workspace";
 import { Setup } from "./Setup";
@@ -29,6 +29,8 @@ applyTheme(resolveTheme(savedTheme, window.matchMedia("(prefers-color-scheme: da
 
 function App({ account }: { account: CurrentAccount }) {
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [signingOut, setSigningOut] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [project, setProject] = useState("");
   const [mode, setMode] = useState("live");
@@ -56,7 +58,8 @@ function App({ account }: { account: CurrentAccount }) {
         setCapabilities(c.items);
         setError("");
       })
-      .catch((e) => { if (active) setError(e.message); });
+      .catch((e) => { if (active) setError(e.message); })
+      .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
   const modelStorageKey = `rag-model-defaults:${account.user?.id || "local"}`;
@@ -190,7 +193,7 @@ function App({ account }: { account: CurrentAccount }) {
               Ask a question. Inspect its sources. Choose what works.
             </p>
           </div>
-          <div className="account-actions"><span className="caption">{account.user?.username || "Local workspace"}</span>{account.user && <Button onClick={async () => { try { await post("/auth/logout", {}); location.replace("/login"); } catch (e) { setError((e as Error).message); } }}>Sign out</Button>}</div>
+          <div className="account-actions"><span className="caption">{account.user?.username || "Local workspace"}</span>{account.user && <Button loading={signingOut} onClick={async () => { setSigningOut(true); try { await post("/auth/logout", {}); location.replace("/login"); } catch (e) { setError((e as Error).message); setSigningOut(false); } }}>Sign out</Button>}</div>
         </header>
         {mode !== "live" && (
           <div className="notice">
@@ -198,7 +201,7 @@ function App({ account }: { account: CurrentAccount }) {
           </div>
         )}
         {error && <ErrorNotice message={error} />}
-        {view === "setup" ? <Setup hosted={account.deployment === "hosted"} modelSelection={modelSelection} modelOptions={modelOptions} modelStatus={modelStatus} modelError={modelError} onModelSelection={updateModelSelection} onRefreshModels={refreshModels} onKeyChanged={() => { void api<{ items: Capability[] }>("/system/capabilities").then(c => setCapabilities(c.items)); }} /> : !project ? (
+        {loading ? <p role="status"><Loading label="Loading workspace" /> Loading workspace…</p> : view === "setup" ? <Setup hosted={account.deployment === "hosted"} modelSelection={modelSelection} modelOptions={modelOptions} modelStatus={modelStatus} modelError={modelError} onModelSelection={updateModelSelection} onRefreshModels={refreshModels} onKeyChanged={() => { void api<{ items: Capability[] }>("/system/capabilities").then(c => setCapabilities(c.items)); }} /> : !project ? (
           <Empty title="Start with a project">
             <p>Keep a set of documents and comparisons together.</p>
             <form onSubmit={addProject} className="inline-form">

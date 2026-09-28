@@ -29,8 +29,13 @@ export function applyModelDefaults(config: Pipeline, selection: ModelSelection):
   const next = structuredClone(config);
   if (selection.generation) {
     const profile = selection.generation;
+    const changed = next.generation.model !== profile.models[0];
     next.generation.profile_id = profile.id;
     next.generation.model = profile.models[0];
+    if (changed) {
+      next.generation.seed = null;
+      next.generation.temperature = 0;
+    }
     if (profile.max_output_tokens != null) {
       next.generation.max_output_tokens = Math.min(
         next.generation.max_output_tokens,
@@ -51,4 +56,19 @@ export function applyModelDefaults(config: Pipeline, selection: ModelSelection):
     if (profile.dimensions != null) next.embedding.dimensions = profile.dimensions;
   }
   return next;
+}
+
+export function pipelineUsesModels(config: Pipeline, selection: ModelSelection) {
+  const generation = selection.generation;
+  if (!generation || config.generation.model !== generation.models[0]) return false;
+  if (
+    config.embedding &&
+    (!selection.embedding ||
+      config.embedding.model !== selection.embedding.models[0] ||
+      config.embedding.dimensions !== selection.embedding.dimensions)
+  ) return false;
+  return !config.tree || (
+    config.tree.index_model === generation.models[0] &&
+    config.tree.selection_model === generation.models[0]
+  );
 }

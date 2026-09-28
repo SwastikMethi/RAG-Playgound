@@ -374,6 +374,18 @@ form {
 .button.danger {
   color: var(--danger);
 }
+.loading-indicator {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 .muted,
 .caption {
   color: var(--muted);
@@ -518,6 +530,12 @@ form {
   height: 6px;
   border-radius: 50%;
   background: currentColor;
+}
+.status[aria-busy="true"] > span {
+  animation: pulse 1.1s ease-in-out infinite alternate;
+}
+@keyframes pulse {
+  to { opacity: .3; transform: scale(.75); }
 }
 .status.ready,
 .status.completed {

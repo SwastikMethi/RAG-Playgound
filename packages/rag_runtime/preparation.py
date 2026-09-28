@@ -10,6 +10,8 @@ async def prepare_sources(
     sources, config, scope, profiles, gateway, *, raw_paths=None, root=None,
     before_embedding: Callable[[int], None] | None = None,
 ):
+    from .registry import resolve_profile
+
     chunks, parents = [], []
     for source in sources:
         if config["tree"]:
@@ -40,7 +42,12 @@ async def prepare_sources(
             document = await build_document(
                 raw_paths[source["source_id"]],
                 source,
-                profiles[config["tree"]["index_profile_id"]],
+                resolve_profile(
+                    profiles,
+                    config["tree"]["index_profile_id"],
+                    config["tree"]["index_model"],
+                    "tree_indexing",
+                ),
                 gateway,
                 root=root,
             )
@@ -56,7 +63,8 @@ async def prepare_sources(
             before_embedding(len(chunks))
         emb = config["embedding"]
         vector = await gateway.embed(
-            profiles[emb["profile_id"]], [emb["document_prefix"] + c["excerpt"] for c in chunks]
+            resolve_profile(profiles, emb["profile_id"], emb["model"], "embedding"),
+            [emb["document_prefix"] + c["excerpt"] for c in chunks],
         )
         prepared["recordings"].append(vector["recording"])
         prepared.update(vectors=vector["vectors"], preparation_usage=vector["usage"])

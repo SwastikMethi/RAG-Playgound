@@ -100,17 +100,58 @@ def defaults(technique: str, profiles: dict, reranker_revision: str = "") -> dic
     )
 
 
-def resolve_profile(profiles: dict, profile_id: str, model: str, operation: str):
-    p = profiles.get(profile_id)
-    if not p or p.model != model or operation not in p.operations:
+def resolve_profile(
+    profiles: dict, profile_id: str, model: str, operation: str, require_available: bool = True
+):
+    historical = profiles.get(profile_id)
+    if historical and historical.model == model and operation in historical.operations:
+        if require_available and historical.unavailable_reason:
+            raise Problem("MISSING_CREDENTIALS", historical.unavailable_reason, 409)
+        return historical
+    matches = []
+    if historical:
+        matches = [
+            profile
+            for profile in profiles.values()
+            if profile.model == model
+            and operation in profile.operations
+            and profile.kind == historical.kind
+            and profile.base_url == historical.base_url
+            and profile.api_key_env == historical.api_key_env
+        ]
+    if len(matches) != 1:
         raise Problem(
             "PROFILE_CHANGED",
             "The selected model profile is unavailable or has changed. Save a new revision.",
             409,
         )
-    if p.unavailable_reason:
-        raise Problem("MISSING_CREDENTIALS", p.unavailable_reason, 409)
-    return p
+    profile = matches[0]
+    if profile.id != profile_id:
+        profile = profile.model_copy(update={"id": profile_id})
+    if require_available and profile.unavailable_reason:
+        raise Problem("MISSING_CREDENTIALS", profile.unavailable_reason, 409)
+    return profile
+
+
+def config_profiles(config: dict, profiles: dict, require_available: bool = True) -> dict:
+    fields = [(config["generation"], "generation")]
+    if config["embedding"]:
+        fields.append((config["embedding"], "embedding"))
+    if config["tree"]:
+        tree = config["tree"]
+        fields += [
+            (dict(profile_id=tree["index_profile_id"], model=tree["index_model"]), "tree_indexing"),
+            (
+                dict(profile_id=tree["selection_profile_id"], model=tree["selection_model"]),
+                "tree_selection",
+            ),
+        ]
+    return {
+        field["profile_id"]: resolve_profile(
+            profiles, field["profile_id"], field["model"], operation, require_available
+        )
+        for field, operation in fields
+    }
 
 
 def check_config(config: dict, profiles: dict, require_available=True, require_local_adapters=True):
@@ -125,11 +166,9 @@ def check_config(config: dict, profiles: dict, require_available=True, require_l
             (dict(profile_id=t["selection_profile_id"], model=t["selection_model"]), "tree_selection"),
         ]
     for field, operation in fields:
-        p = profiles.get(field["profile_id"])
-        if not p or p.model != field["model"] or operation not in p.operations:
-            raise Problem("PROFILE_CHANGED", "Select an available server-managed model profile.", 409)
-        if require_available:
-            resolve_profile(profiles, p.id, field["model"], operation)
+        p = resolve_profile(
+            profiles, field["profile_id"], field["model"], operation, require_available
+        )
         if operation == "embedding" and field["dimensions"] != p.dimensions:
             raise Problem("VALIDATION_ERROR", "Embedding dimensions must match the configured model profile.")
         if operation == "generation":
@@ -212,10 +251,20 @@ def preparation_identity(config: dict, corpus_fingerprint: str, profiles: dict) 
             chunking=config["chunking"],
             parent=config["parent"],
             embedding=emb,
-            embedding_profile=profiles[emb["profile_id"]].fingerprint() if emb else None,
+            embedding_profile=resolve_profile(
+                profiles, emb["profile_id"], emb["model"], "embedding", False
+            ).fingerprint()
+            if emb
+            else None,
             tree_index=dict(
                 model=tree["index_model"],
-                profile=profiles[tree["index_profile_id"]].fingerprint(),
+                profile=resolve_profile(
+                    profiles,
+                    tree["index_profile_id"],
+                    tree["index_model"],
+                    "tree_indexing",
+                    False,
+                ).fingerprint(),
                 sdk=tree["sdk_version"],
             )
             if tree

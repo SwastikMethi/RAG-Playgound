@@ -33,7 +33,7 @@ import {
   type Run,
   type Source,
 } from "./api";
-import { Button, Empty, ErrorNotice, Inspector, Status } from "./ui";
+import { Button, Empty, ErrorNotice, Inspector, Loading, Status } from "./ui";
 import {
   emptyState,
   reduceEvent,
@@ -49,7 +49,11 @@ import { LaneFeedback, RunPreference } from "./Judgement";
 import { ExportPanel } from "./ExportPanel";
 import { PostgresSource } from "./PostgresSource";
 import { Workflow, StepInspector, LiveDuration } from "./Workflow";
-import { applyModelDefaults, type ModelSelection } from "./modelDefaults";
+import {
+  applyModelDefaults,
+  pipelineUsesModels,
+  type ModelSelection,
+} from "./modelDefaults";
 import {
   MAX_CORPUS_BYTES,
   MAX_CORPUS_SOURCES,
@@ -109,12 +113,14 @@ export function Workspace({
   );
   const [bundles, setBundles] = useState<Record<string, Bundle>>({});
   const [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
+    [busyTask, setBusyTask] = useState(""),
     [question, setQuestion] = useState("");
+  const busy = Boolean(busyTask);
   const [run, setRun] = useState<Run | null>(null),
     [history, setHistory] = useState<Run[]>([]),
     [historyQuery, setHistoryQuery] = useState("");
   const [historyStatus, setHistoryStatus] = useState("");
+  const [workspaceLoading, setWorkspaceLoading] = useState(true);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [setupOpen, setSetupOpen] = useState(true);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
@@ -191,7 +197,7 @@ export function Workspace({
     setCorpusId((prior) => c.items.some((c) => c.id === prior) ? prior : c.items[0]?.id || "");
   }, [project]);
   useEffect(() => {
-    load().catch((e) => setError(e.message));
+    load().catch((e) => setError(e.message)).finally(() => setWorkspaceLoading(false));
   }, [load]);
   useEffect(() => {
     sessionStorage.setItem(`lanes:${project}`, JSON.stringify(selected));
@@ -314,15 +320,15 @@ export function Workspace({
       setConnected(false);
     };
   }, [run?.id, connectionAttempt]);
-  async function action(work: () => Promise<void>) {
-    setBusy(true);
+  async function action(work: () => Promise<void>, task = "working") {
+    setBusyTask(task);
     setError("");
     try {
       await work();
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setBusy(false);
+      setBusyTask("");
     }
   }
   async function upload(files: FileList | null) {
@@ -338,7 +344,7 @@ export function Workspace({
         setSelectedSources((prior) => [...prior, source.id]);
       }
       await load();
-    });
+    }, "upload");
   }
   async function freezeCorpus() {
     if (sourceSelectionError) {
@@ -352,7 +358,7 @@ export function Workspace({
       setCorpusId(c.id);
       await load();
       onView("playground");
-    });
+    }, "corpus");
   }
   async function addTechnique(capability: Capability) {
     const defaultConfig = capability.default_config;
@@ -364,13 +370,32 @@ export function Workspace({
       );
       setConfigs((prior) => [...prior, cfg]);
       setSelected((prior) => [...prior, cfg.id]);
-    });
+    }, "technique");
   }
   async function prepare() {
+    if (!modelsReady) return;
     await action(async () => {
-      const next = { ...bundles };
-      for (const config of selectedConfigs) {
-        if (next[config.id]?.status === "ready") continue;
+      const created: Configuration[] = [];
+      const reconciled: Configuration[] = [];
+      for (const current of selectedConfigs) {
+        const config = pipelineUsesModels(current.config, modelSelection)
+          ? current
+          : await post<Configuration>(`/projects/${project}/configurations`, {
+              name: current.name,
+              based_on_config_id: current.id,
+              config: applyModelDefaults(current.config, modelSelection),
+            });
+        if (config !== current) created.push(config);
+        reconciled.push(config);
+      }
+      if (created.length) setConfigs((prior) => [...prior, ...created]);
+      setSelected(reconciled.map((config) => config.id));
+      const next: Record<string, Bundle> = {};
+      for (const config of reconciled) {
+        if (bundles[config.id]?.status === "ready") {
+          next[config.id] = bundles[config.id];
+          continue;
+        }
         next[config.id] = await post<Bundle>(
           `/projects/${project}/preparations`,
           { corpus_version_id: corpusId, config_id: config.id },
@@ -384,7 +409,7 @@ export function Workspace({
           Object.fromEntries(Object.entries(next).map(([id, b]) => [id, b.id])),
         ),
       );
-    });
+    }, "prepare");
   }
   async function ask(e: FormEvent) {
     e.preventDefault();
@@ -402,7 +427,7 @@ export function Workspace({
         true,
       );
       openRun(result);
-    });
+    }, "run");
   }
   function openRun(next: Run) {
     sessionStorage.setItem(`bundles:${project}:${next.corpus_version_id}`, JSON.stringify(
@@ -433,8 +458,13 @@ export function Workspace({
   }
   const ready =
     !!corpus &&
+    modelsReady &&
     selectedConfigs.length > 0 &&
-    selectedConfigs.every((c) => bundles[c.id]?.status === "ready");
+    selectedConfigs.every(
+      (c) =>
+        pipelineUsesModels(c.config, modelSelection) &&
+        bundles[c.id]?.status === "ready",
+    );
   const active = !!run && !terminal(run.status);
   const stageBoundaries = events
     .filter(
@@ -447,6 +477,7 @@ export function Workspace({
   return (
     <div className="workspace-body">
       <div className="workspace-content">
+        {workspaceLoading && <p role="status"><Loading label="Loading project workspace" /> Loading project workspace…</p>}
         {error && <ErrorNotice message={error} />}
         {view === "sources" ? (
           <>
@@ -465,6 +496,7 @@ export function Workspace({
                 Connect PostgreSQL
               </Button>
               <label className={`button ${busy ? "disabled" : ""}`}>
+                {busyTask === "upload" && <Loading label="Uploading files" />}
                 <Upload size={16} />
                 Upload files
                 <input
@@ -545,6 +577,7 @@ export function Workspace({
                   </span>
                   <Button
                     tone="primary"
+                    loading={busyTask === "corpus"}
                     disabled={
                       busy ||
                       !!sourceSelectionError ||
@@ -643,8 +676,9 @@ export function Workspace({
               <div className="setup-spacer" />
               <span className="caption">{selectedConfigs.length}/6 lanes</span>
               <Button
+                loading={busyTask === "prepare"}
                 disabled={
-                  busy || !corpus || !selectedConfigs.length || ready || active
+                  busy || !modelsReady || !corpus || !selectedConfigs.length || ready || active
                 }
                 onClick={prepare}
               >
@@ -670,6 +704,7 @@ export function Workspace({
               </summary>
               {configs.length > 0 && <label>Use a saved configuration<select value="" disabled={active || selected.length >= 6} onChange={(e) => { if (e.target.value) setSelected((prior) => [...prior, e.target.value]); }}><option value="">Choose a saved revision…</option>{configs.map((c) => <option key={c.id} value={c.id} disabled={selected.includes(c.id)}>{c.name} · revision {c.revision}</option>)}</select></label>}
               {!modelsReady && <p className="caption">Check model access in Setup before adding a new pipeline.</p>}
+              {busyTask === "technique" && <p className="caption"><Loading label="Adding technique" /> Adding technique…</p>}
               <div className="technique-grid">
                 {capabilities.map((c) => (
                   <button
@@ -750,13 +785,14 @@ export function Workspace({
               />
               <div>
                 <span className="caption">
-                  {ready
-                    ? `Same question · ${selectedConfigs[0]?.config.generation.model} · ${selectedConfigs[0]?.config.generation.context_budget_tokens.toLocaleString()} context tokens`
-                    : "Add sources and prepare at least one technique to ask."}
+                  {run?.lanes[0]?.config_snapshot.generation.model
+                    || modelSelection.generation?.models[0]
+                    || "Choose an answer model in Setup."}
                 </span>
                 <Button
                   tone="primary"
                   type="submit"
+                  loading={busyTask === "run"}
                   disabled={!ready || busy || active || !question.trim()}
                 >
                   <ArrowUp size={17} />
@@ -1195,13 +1231,16 @@ export function Workspace({
             <ConfigurationForm
               config={inspection.config}
               busy={busy}
+              modelsReady={modelsReady}
+              modelSelection={modelSelection}
               save={(config, alignGeneration) =>
                 action(async () => {
+                  const effective = applyModelDefaults(config, modelSelection);
                   const saved = await post<Configuration>(
                     `/projects/${project}/configurations`,
                     {
                       name: inspection.config.name,
-                      config,
+                      config: effective,
                       based_on_config_id: inspection.config.id,
                     },
                   );
@@ -1211,7 +1250,10 @@ export function Workspace({
                     for (const other of originals) {
                       aligned.push(await post<Configuration>(`/projects/${project}/configurations`, {
                         name: other.name, based_on_config_id: other.id,
-                        config: { ...other.config, generation: config.generation },
+                        config: applyModelDefaults(
+                          { ...other.config, generation: effective.generation },
+                          modelSelection,
+                        ),
                       }));
                     }
                   }
@@ -1224,7 +1266,7 @@ export function Workspace({
                     ),
                   );
                   setInspection({ kind: "settings", config: saved });
-                })
+                }, "revision")
               }
             />
           ) : inspection.kind === "step" && run ? (
@@ -1345,17 +1387,18 @@ function SourceInspector({
 function ConfigurationForm({
   config,
   busy,
+  modelsReady,
+  modelSelection,
   save,
 }: {
   config: Configuration;
   busy: boolean;
+  modelsReady: boolean;
+  modelSelection: ModelSelection;
   save: (config: Pipeline, align: boolean) => void;
 }) {
   const [draft, setDraft] = useState<Pipeline>(structuredClone(config.config));
-  const [profiles, setProfiles] = useState<components["schemas"]["Profile"][]>([]);
-  const [profileError, setProfileError] = useState("");
   const [align, setAlign] = useState(false);
-  useEffect(() => { api<{ items: components["schemas"]["Profile"][] }>("/system/profiles").then((p) => setProfiles(p.items)).catch((e) => setProfileError(e.message)); }, []);
   const valueAt = (path: string[]) => path.reduce((value, key) => (value as Record<string, unknown>)[key], draft as unknown);
   const update = (path: string[], value: unknown) => setDraft((prior) => {
     const next = structuredClone(prior);
@@ -1363,8 +1406,6 @@ function ConfigurationForm({
     parent[path.at(-1)!] = value; return next;
   });
   const field = (path: string[], label: string, min: number, max: number, step = 1, nullable = false) => <label>{label}<input type="number" min={min} max={max} step={step} required={!nullable} value={valueAt(path) == null ? "" : Number(valueAt(path))} onChange={(e) => update(path, nullable && e.target.value === "" ? null : Number(e.target.value))} /></label>;
-  const profileSelect = (operation: "generation" | "embedding" | "tree_indexing" | "tree_selection", selected: string, change: (p: components["schemas"]["Profile"]) => void) => <label>{operation.replaceAll("_", " ")} model<select value={selected} onChange={(e) => { const p = profiles.find((p) => p.id === e.target.value); if (p) change(p); }}>{profiles.filter((p) => p.operations.includes(operation)).map((p) => <option value={p.id} key={p.id} disabled={!p.available}>{p.label} · {p.models.join(", ")}{p.available ? "" : " · unavailable"}</option>)}</select></label>;
-
   useEffect(() => setDraft(structuredClone(config.config)), [config.id]);
   const number = (
     section: "search" | "generation",
@@ -1393,7 +1434,7 @@ function ConfigurationForm({
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        save(draft, align);
+        save(applyModelDefaults(draft, modelSelection), align);
       }}
     >
       <h3>{config.name}</h3>
@@ -1401,8 +1442,6 @@ function ConfigurationForm({
         Saving creates a new revision. Prepare it before running. Generation
         settings must match across compared lanes.
       </p>
-      {profileError && <ErrorNotice message={profileError} />}
-      {profileSelect("generation", draft.generation.profile_id, (p) => setDraft({ ...draft, generation: { ...draft.generation, profile_id: p.id, model: p.models[0], max_output_tokens: Math.min(draft.generation.max_output_tokens, p.max_output_tokens || 512), seed: null, temperature: 0 } }))}
       {number("search", "candidate_k", "Candidate passages", 1, 100)}
       {number("search", "context_k", "Context passages", 1, 20)}
       {number(
@@ -1499,7 +1538,6 @@ function ConfigurationForm({
       <details><summary>Advanced retrieval settings</summary>
         {draft.search.bm25 && <>{field(["search","bm25","k1"], "BM25 term saturation (k1)", .1, 3, .1)}{field(["search","bm25","b"], "BM25 length normalization (b)", 0, 1, .05)}{field(["search","bm25","epsilon"], "BM25 epsilon", 0, 1, .05)}</>}
         {draft.embedding && <>
-          {profileSelect("embedding", draft.embedding.profile_id, (p) => setDraft({ ...draft, embedding: { ...draft.embedding!, profile_id: p.id, model: p.models[0], dimensions: p.dimensions! } }))}
           <label>Document prefix<input value={draft.embedding.document_prefix} maxLength={200} onChange={(e) => update(["embedding","document_prefix"], e.target.value)} /></label>
           <label>Query prefix<input value={draft.embedding.query_prefix} maxLength={200} onChange={(e) => update(["embedding","query_prefix"], e.target.value)} /></label>
         </>}
@@ -1512,8 +1550,6 @@ function ConfigurationForm({
         {draft.parent && field(["parent","max_parent_tokens"], "Maximum parent tokens", 256, 4096)}
         {draft.reranker && <>{field(["reranker","max_input_tokens"], "Reranker scoring tokens", 64, 512)}<label>Reranker device<select value={draft.reranker.device} onChange={(e) => update(["reranker","device"], e.target.value)}><option value="cpu">CPU</option><option value="cuda">CUDA (requires available GPU)</option></select></label></>}
         {draft.tree && <>
-          {profileSelect("tree_indexing", draft.tree.index_profile_id, (p) => setDraft({ ...draft, tree: { ...draft.tree!, index_profile_id: p.id, index_model: p.models[0] } }))}
-          {profileSelect("tree_selection", draft.tree.selection_profile_id, (p) => setDraft({ ...draft, tree: { ...draft.tree!, selection_profile_id: p.id, selection_model: p.models[0] } }))}
           {field(["tree","max_documents"], "Maximum selected PDFs", 1, 3)}{field(["tree","max_depth"], "Tree depth limit", 1, 4)}{field(["tree","max_nodes"], "Tree node limit", 1, 12)}{field(["tree","max_calls"], "Tree model call limit", 1, 8)}{field(["tree","max_pages"], "Selected page limit", 1, 12)}
         </>}
         {field(["generation","seed"], "Answer seed (blank unless profile supports it)", 0, 2147483647, 1, true)}
@@ -1526,7 +1562,8 @@ function ConfigurationForm({
           {JSON.stringify(draft, null, 2)}
         </pre>
       </details>
-      <Button type="submit" tone="primary" disabled={busy}>
+      {!modelsReady && <p className="caption">Choose available models in Setup before saving a revision.</p>}
+      <Button type="submit" tone="primary" disabled={busy || !modelsReady} loading={busy}>
         Save new revision
       </Button>
     </form>

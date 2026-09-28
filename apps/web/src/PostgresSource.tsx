@@ -33,8 +33,9 @@ export function PostgresSource({
   );
   const [preview, setPreview] = useState<Preview | null>(null),
     [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
+    [busyTask, setBusyTask] = useState(""),
     [jobId, setJobId] = useState("");
+  const busy = Boolean(busyTask);
   const [add, setAdd] = useState(false);
   async function load() {
     const result = await apiAll<Connection>(
@@ -83,15 +84,15 @@ export function PostgresSource({
   };
   const ready =
     !!relation && keys.length > 0 && texts.length > 0 && !!name.trim();
-  async function work(fn: () => Promise<void>) {
+  async function work(fn: () => Promise<void>, task = "postgres") {
     setError("");
-    setBusy(true);
+    setBusyTask(task);
     try {
       await fn();
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setBusy(false);
+      setBusyTask("");
     }
   }
   async function saveConnection(event: FormEvent<HTMLFormElement>) {
@@ -119,7 +120,7 @@ export function PostgresSource({
       await load();
       setConnection(result.id);
       setAdd(false);
-    });
+    }, "save-connection");
   }
   const toggle = (values: string[], key: string, checked: boolean) =>
     checked ? [...values, key] : values.filter((v) => v !== key);
@@ -166,7 +167,7 @@ export function PostgresSource({
                   await api(`/connections/${connection}`, { method: "DELETE" });
                   setConnection("");
                   await load();
-                });
+                }, "remove-connection");
             }}
           >
             Remove connection
@@ -213,7 +214,7 @@ export function PostgresSource({
               </option>
             </select>
           </label>
-          <Button type="submit" tone="primary" disabled={busy}>
+          <Button type="submit" tone="primary" loading={busyTask === "save-connection"} disabled={busy}>
             Save and inspect
           </Button>
         </form>
@@ -359,15 +360,18 @@ export function PostgresSource({
                 <Button
                   disabled={!ready || busy}
                   onClick={() =>
-                    work(async () =>
+                    work(
+                      async () =>
                       setPreview(
                         await post<Preview>(
                           `/connections/${connection}/preview`,
                           selection,
                         ),
                       ),
+                      "preview",
                     )
                   }
+                  loading={busyTask === "preview"}
                 >
                   Preview five records
                 </Button>
@@ -392,8 +396,9 @@ export function PostgresSource({
                           source.error?.message || "Snapshot capture stopped.",
                         );
                       await onReady(source);
-                    })
+                    }, "capture")
                   }
+                  loading={busyTask === "capture"}
                 >
                   {jobId
                     ? "Capturing…"

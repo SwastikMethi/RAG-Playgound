@@ -4,6 +4,7 @@ import {
   applyModelDefaults,
   chooseModelDefaults,
   modelSelectionReady,
+  pipelineUsesModels,
   type ModelOptions,
   type PublicProfile,
 } from "./modelDefaults";
@@ -63,6 +64,67 @@ it("applies selected models only to a cloned new pipeline configuration", () => 
     selection_model: "gpt-new",
   });
   expect(original.generation.profile_id).toBe("old");
+});
+
+it("resets answer controls only when the selected answer model changes", () => {
+  const original = {
+    generation: {
+      profile_id: "old",
+      model: "gpt-old",
+      max_output_tokens: 512,
+      seed: 42,
+      temperature: 0.8,
+    },
+    embedding: null,
+    tree: null,
+  } as Pipeline;
+
+  expect(applyModelDefaults(original, { generation })).toMatchObject({
+    generation: {
+      profile_id: "answer-new",
+      model: "gpt-new",
+      max_output_tokens: 256,
+      seed: null,
+      temperature: 0,
+    },
+  });
+  expect(
+    applyModelDefaults(
+      { ...original, generation: { ...original.generation, model: "gpt-new" } },
+      { generation },
+    ).generation,
+  ).toMatchObject({ seed: 42, temperature: 0.8 });
+});
+
+it("requires revisions for actual model or dimension changes, not historical profile ids", () => {
+  const matching = {
+    generation: { profile_id: "historical-answer", model: "gpt-new" },
+    embedding: {
+      profile_id: "historical-embedding",
+      model: "embed-new",
+      dimensions: 3072,
+    },
+    tree: {
+      index_profile_id: "historical-answer",
+      index_model: "gpt-new",
+      selection_profile_id: "historical-answer",
+      selection_model: "gpt-new",
+    },
+  } as Pipeline;
+
+  expect(pipelineUsesModels(matching, { generation, embedding })).toBe(true);
+  expect(
+    pipelineUsesModels(
+      { ...matching, embedding: { ...matching.embedding!, dimensions: 1536 } },
+      { generation, embedding },
+    ),
+  ).toBe(false);
+  expect(
+    pipelineUsesModels(
+      { ...matching, generation: { ...matching.generation, model: "gpt-old" } },
+      { generation, embedding },
+    ),
+  ).toBe(false);
 });
 
 it("restores browser defaults only when both profiles are still offered", () => {
