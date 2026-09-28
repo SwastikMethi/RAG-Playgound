@@ -49,9 +49,16 @@ import { LaneFeedback, RunPreference } from "./Judgement";
 import { ExportPanel } from "./ExportPanel";
 import { PostgresSource } from "./PostgresSource";
 import { Workflow, StepInspector, LiveDuration } from "./Workflow";
+import { applyModelDefaults, type ModelSelection } from "./modelDefaults";
+import {
+  MAX_CORPUS_BYTES,
+  MAX_CORPUS_SOURCES,
+  formatBytes,
+  selectedSourceBytes,
+  sourceSelectionError as selectionError,
+} from "./sourceSelection";
 
 type View = "playground" | "sources" | "history";
-const MAX_CORPUS_SOURCES = 50;
 type Inspection =
   | { kind: "delete"; source: Source }
   | { kind: "export"; lane: Lane; runId: string }
@@ -78,11 +85,15 @@ const answerComponents: Components = {
 export function Workspace({
   project,
   capabilities,
+  modelSelection,
+  modelsReady,
   view,
   onView,
 }: {
   project: string;
   capabilities: Capability[];
+  modelSelection: ModelSelection;
+  modelsReady: boolean;
   view: View;
   onView: (view: View) => void;
 }) {
@@ -91,10 +102,8 @@ export function Workspace({
     [configs, setConfigs] = useState<Configuration[]>([]);
   const [corpusId, setCorpusId] = useState(""),
     [selectedSources, setSelectedSources] = useState<string[]>([]);
-  const excessSources = selectedSources.length - MAX_CORPUS_SOURCES;
-  const sourceSelectionError = excessSources > 0
-    ? `Select at most ${MAX_CORPUS_SOURCES} sources per corpus. Deselect ${excessSources} source${excessSources === 1 ? "" : "s"} to continue.`
-    : "";
+  const selectedBytes = selectedSourceBytes(sources, selectedSources);
+  const sourceSelectionError = selectionError(selectedSources.length, selectedBytes);
   const [selected, setSelected] = useState<string[]>(() =>
     JSON.parse(sessionStorage.getItem(`lanes:${project}`) || "[]"),
   );
@@ -346,11 +355,12 @@ export function Workspace({
     });
   }
   async function addTechnique(capability: Capability) {
-    if (!capability.default_config || selected.length >= 6) return;
+    const defaultConfig = capability.default_config;
+    if (!defaultConfig || !modelsReady || selected.length >= 6) return;
     await action(async () => {
       const cfg = await post<Configuration>(
         `/projects/${project}/configurations`,
-        { name: capability.display_name, config: capability.default_config },
+        { name: capability.display_name, config: applyModelDefaults(defaultConfig, modelSelection) },
       );
       setConfigs((prior) => [...prior, cfg]);
       setSelected((prior) => [...prior, cfg.id]);
@@ -504,7 +514,7 @@ export function Workspace({
                       <strong>{source.display_name}</strong>
                       <span className="caption">
                         {source.metadata.format as string} ·{" "}
-                        {Math.round((source.size_bytes || 0) / 1024)} KB
+                        {formatBytes(source.size_bytes || 0)}
                       </span>
                       {source.error && (
                         <span className="error-text">
@@ -531,7 +541,7 @@ export function Workspace({
                 {sourceSelectionError && <ErrorNotice message={sourceSelectionError} />}
                 <div className="source-footer">
                   <span className="muted">
-                    {selectedSources.length} / {MAX_CORPUS_SOURCES} selected
+                    {selectedSources.length} / {MAX_CORPUS_SOURCES} selected · {formatBytes(selectedBytes)} / {formatBytes(MAX_CORPUS_BYTES)}
                   </span>
                   <Button
                     tone="primary"
@@ -659,6 +669,7 @@ export function Workspace({
                 </span>
               </summary>
               {configs.length > 0 && <label>Use a saved configuration<select value="" disabled={active || selected.length >= 6} onChange={(e) => { if (e.target.value) setSelected((prior) => [...prior, e.target.value]); }}><option value="">Choose a saved revision…</option>{configs.map((c) => <option key={c.id} value={c.id} disabled={selected.includes(c.id)}>{c.name} · revision {c.revision}</option>)}</select></label>}
+              {!modelsReady && <p className="caption">Check model access in Setup before adding a new pipeline.</p>}
               <div className="technique-grid">
                 {capabilities.map((c) => (
                   <button
@@ -666,6 +677,7 @@ export function Workspace({
                     className="technique-option"
                     disabled={
                       !c.available ||
+                      !modelsReady ||
                       (c.technique === "pageindex" && !!treeCorpusReason) ||
                       busy ||
                       selected.length >= 6 ||

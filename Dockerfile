@@ -8,7 +8,7 @@ RUN npm run build
 
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 WORKDIR /app
-ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy PATH="/app/.venv/bin:$PATH"
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy PATH="/app/.venv/bin:$PATH" HF_HOME=/opt/models/huggingface
 RUN apt-get update && apt-get install -y --no-install-recommends libglib2.0-0 libgl1 libgomp1 && rm -rf /var/lib/apt/lists/*
 COPY pyproject.toml uv.lock ./
 COPY packages ./packages
@@ -21,6 +21,7 @@ COPY migrations ./migrations
 COPY tools ./tools
 COPY config ./config
 COPY deploy/verify_restore.py ./deploy/verify_restore.py
+RUN python tools/prepare_models.py --reranker && chmod -R a+rX /opt/models
 RUN groupadd --gid 10001 rag && useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin rag
 COPY --from=web /build/apps/web/dist ./apps/web/dist
 EXPOSE 8000

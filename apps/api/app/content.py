@@ -256,7 +256,11 @@ def prepare(project_id: str, body: dict, request: Request, idempotency_key: str 
         from .deletion import require_corpus_ready
 
         require_corpus_ready(s, corpus)
-        check_config(config.config, request.state.profiles)
+        check_config(
+            config.config,
+            request.state.profiles,
+            require_local_adapters=request.app.state.settings.deployment != "hosted",
+        )
         if config.config["technique"] == "pageindex":
             sources = list(
                 s.scalars(

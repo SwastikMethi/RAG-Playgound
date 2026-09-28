@@ -123,6 +123,12 @@ def test_all_chunk_adapter_exports_are_private_and_replay_the_shared_runtime(cli
             "app/main.py",
             "src/rag_runtime/runtime.py",
         } <= set(names)
+        assert "src/rag_runtime/export_replay.py" not in names
+        assert "src/rag_runtime/operational.py" not in names
+        assert "src/rag_runtime/pageindex_adapter.py" not in names
+        assert "src/rag_runtime/pageindex_build.py" not in names
+        assert "src/rag_runtime/postgres_source.py" not in names
+        assert ("src/rag_runtime/reranker.py" in names) == (technique == "hybrid_rerank")
         all_content = b"\n".join(archive.read(name) for name in names)
         for forbidden in [
             text,

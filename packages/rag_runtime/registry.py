@@ -1,10 +1,9 @@
 """Six concrete adapters and server-resolved effective defaults."""
 
-from importlib.metadata import version, PackageNotFoundError
+from importlib.metadata import version
 
 from .contracts import digest, validate
 from .errors import Problem
-from .reranker import unavailable_reason as reranker_unavailable
 
 TECHNIQUES = {
     "bm25": ("Keyword · BM25", "Ranks passages by matching words and their rarity in your corpus."),
@@ -35,6 +34,8 @@ def defaults(technique: str, profiles: dict, reranker_revision: str = "") -> dic
     ]
     vector = technique in {"dense", "hybrid", "hybrid_rerank", "parent_child"}
     tree = technique == "pageindex"
+    if tree:
+        from .pageindex_adapter import SDK_VERSION
     if not gen or (vector and not emb) or (tree and (not index or not selection)):
         return None
     child = technique == "parent_child"
@@ -77,7 +78,7 @@ def defaults(technique: str, profiles: dict, reranker_revision: str = "") -> dic
             index_model=index.model,
             selection_profile_id=selection.id,
             selection_model=selection.model,
-            sdk_version=installed_version("pageindex"),
+            sdk_version=SDK_VERSION,
             max_documents=3,
             max_depth=4,
             max_nodes=12,
@@ -112,7 +113,7 @@ def resolve_profile(profiles: dict, profile_id: str, model: str, operation: str)
     return p
 
 
-def check_config(config: dict, profiles: dict, require_available=True):
+def check_config(config: dict, profiles: dict, require_available=True, require_local_adapters=True):
     validate(config)
     fields = [(config["generation"], "generation")]
     if config["embedding"]:
@@ -142,27 +143,23 @@ def check_config(config: dict, profiles: dict, require_available=True):
         c = config["chunking"]
         if c["tokenizer"] != "cl100k_base" or c["tokenizer_revision"] != version("tiktoken"):
             raise Problem("UNSUPPORTED_TOKENIZER", "Choose the installed cl100k_base tokenizer revision.")
-    if config["reranker"]:
+    if config["reranker"] and require_local_adapters:
+        from .reranker import unavailable_reason as reranker_unavailable
+
         reason = reranker_unavailable(config["reranker"])
         if reason and require_available:
             raise Problem("MODEL_NOT_READY", reason, 409)
     if config["tree"]:
         from .pageindex_adapter import unavailable_reason, SDK_VERSION
 
-        reason = unavailable_reason()
-        if require_available and reason:
-            raise Problem("ADAPTER_UNAVAILABLE", reason, 409)
+        if require_local_adapters:
+            reason = unavailable_reason()
+            if require_available and reason:
+                raise Problem("ADAPTER_UNAVAILABLE", reason, 409)
         if config["tree"]["sdk_version"] != SDK_VERSION:
             raise Problem(
                 "ADAPTER_UNAVAILABLE", "Select a configuration using the tested PageIndex SDK revision.", 409
             )
-
-
-def installed_version(name):
-    try:
-        return version(name)
-    except PackageNotFoundError:
-        return None
 
 
 def capabilities(profiles, settings):
@@ -174,7 +171,11 @@ def capabilities(profiles, settings):
             reason = "Configure the required generation, embedding or tree model profiles on the server."
         else:
             try:
-                check_config(config, profiles)
+                check_config(
+                    config,
+                    profiles,
+                    require_local_adapters=getattr(settings, "deployment", "local") != "hosted",
+                )
             except Problem as exc:
                 reason = exc.message
         result.append(

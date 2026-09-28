@@ -137,6 +137,8 @@ test("upload, prepare, answer, inspect evidence and replay", async ({
   await expect(page.getByRole("button", { name: "E1", exact: true })).toBeFocused();
   await page.getByRole("button", { name: "Setup", exact: true }).click();
   await expect(page.getByText("Database, migrations and artifact storage are ready.")).toBeVisible();
+  await expect(page.getByLabel("Answer model")).toBeEnabled();
+  await expect(page.getByLabel("Embedding model")).toBeEnabled();
   await page.screenshot({ path: "test-results/setup-mobile.png", fullPage: true });
   const priorSubmissions = submittedRuns;
   const eventsRoute = /\/api\/v1\/runs\/[^/]+\/events\?/;

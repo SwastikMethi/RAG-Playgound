@@ -2,9 +2,6 @@
 
 import argparse
 
-from huggingface_hub import snapshot_download
-from rag_runtime.reranker import MODEL, REVISION
-
 parser = argparse.ArgumentParser()
 parser.add_argument("--reranker", action="store_true")
 parser.add_argument("--pdf", action="store_true")
@@ -12,6 +9,9 @@ args = parser.parse_args()
 if not args.reranker and not args.pdf:
     parser.error("Choose --reranker and/or --pdf")
 if args.reranker:
+    from huggingface_hub import snapshot_download
+    from rag_runtime.reranker import MODEL, REVISION
+
     snapshot_download(
         MODEL, revision=REVISION, allow_patterns=["*.json", "*.txt", "*.safetensors", "README.md"]
     )

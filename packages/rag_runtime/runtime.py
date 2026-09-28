@@ -11,7 +11,6 @@ from .errors import Problem
 from .providers import empty_usage, add_usage
 from .registry import resolve_profile
 from .retrieval import bm25_search, fuse, expand_parents
-from .reranker import rerank
 from .vectors import Scope
 from .trace import Trace, empty_timing
 
@@ -26,7 +25,7 @@ async def execute(
     result: dict | None = None,
     vector_store=None,
     started: float | None = None,
-    rerank_fn=rerank,
+    rerank_fn=None,
 ) -> dict:
     result = result if result is not None else {}
     result.update(
@@ -173,6 +172,9 @@ async def execute(
         else:
             candidates = await lexical()
         if config["reranker"]:
+            if rerank_fn is None:
+                from .reranker import rerank as rerank_fn
+
             async with trace.span(
                 "rerank", retrieval.id, dict(model=config["reranker"]["model"])
             ) as reranking:

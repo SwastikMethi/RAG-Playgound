@@ -240,7 +240,7 @@ export function Workflow({
         animated: !reduceMotion && current[target]?.status === "running",
         style: {
           stroke:
-            current[source]?.status === "completed" ? "#3c958b" : "#c5d1d7",
+            current[source]?.status === "completed" ? "var(--accent)" : "var(--border)",
           strokeWidth: 1.5,
         },
       })),

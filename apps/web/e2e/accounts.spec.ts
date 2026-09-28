@@ -43,14 +43,25 @@ for (const width of [1440, 390]) test(`private key setup and errors at ${width}p
   await page.setViewportSize({width, height: width === 390 ? 844 : 900});
   await page.route('**/api/v1/auth/me', route => route.fulfill({json:{deployment:'hosted',user:{id:'fixture-user',username:'playground-user'},csrf_token:'c'.repeat(64),turnstile_site_key:'fixture-site'}}));
   let configured = false, reject = true;
+  let modelState: 'ready' | 'error' | 'empty' = 'ready';
+  const generation = {id:'answer-new',label:'Answer new',models:['gpt-new'],operations:['generation','tree_selection','tree_indexing'],available:true,unavailable_reason:null,max_input_tokens:100000,max_output_tokens:4096,dimensions:null};
+  const embedding = {id:'embedding-new',label:'Embedding new',models:['embed-new'],operations:['embedding'],available:true,unavailable_reason:null,max_input_tokens:8191,max_output_tokens:null,dimensions:1536};
+  await page.route('**/api/v1/me/openai-models', async route => {
+    if (modelState === 'error') { await route.fulfill({status:503,json:{error:{message:'Model access could not be checked.'}}}); return; }
+    await route.fulfill({json:modelState === 'empty' ? {generation:[],embedding:[]} : {generation:[generation],embedding:[embedding]}});
+  });
   await page.route('**/api/v1/me/openai-key', async route => {
     if (route.request().method() === 'GET') { await route.fulfill({json:{configured}}); return; }
     expect(route.request().headers()['x-csrf-token']).toBe('c'.repeat(64));
     if (reject) { reject=false; await route.fulfill({status:429,json:{error:{message:'Too many attempts. Try again later.'}}}); return; }
     configured = route.request().method() === 'PUT';
+    modelState = configured ? 'error' : 'empty';
     await route.fulfill({status:204});
   });
   await page.goto('/');
+  await page.getByText('New project',{exact:true}).click();
+  await page.getByLabel('New project name').fill(`Model readiness ${width} ${Date.now()}`);
+  await page.getByRole('button',{name:'Create workspace project'}).click();
   await page.getByRole('button',{name:'Setup',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Your OpenAI key'})).toBeVisible();
   await page.getByLabel('OpenAI API key').fill('sk-ui-fixture-key');
@@ -61,10 +72,15 @@ for (const width of [1440, 390]) test(`private key setup and errors at ${width}p
   await page.getByRole('button',{name:'Save key',exact:true}).click();
   await expect(page.getByLabel('OpenAI API key')).toHaveValue('');
   await expect(page.getByText('A key is saved for your account.',{exact:false})).toBeVisible();
+  await expect(page.getByText('Model access could not be checked.')).toBeVisible();
+  await page.getByRole('button',{name:'Playground',exact:true}).click();
+  await expect(page.getByRole('button',{name:/Keyword · BM25/})).toBeDisabled();
+  await page.getByRole('button',{name:'Setup',exact:true}).click();
   await page.getByText('Change password',{exact:true}).click();
   await expect(page.getByLabel('Current password',{exact:true})).toBeVisible();
   await page.screenshot({path:`.data/release/hosted/key-saved-${width}.png`,fullPage:true});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
   await page.getByRole('button',{name:'Remove key',exact:true}).click();
   await expect(page.getByText('Key removed. New model jobs need a key.')).toBeVisible();
+  await expect(page.getByText('No compatible generation and embedding model pair is available.')).toBeVisible();
 });

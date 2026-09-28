@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BookOpen, FlaskConical, History, Plus, Settings2 } from "lucide-react";
 import {
@@ -13,6 +13,19 @@ import "./styles.css";
 import { Workspace } from "./Workspace";
 import { Setup } from "./Setup";
 import { AccountGate, type CurrentAccount } from "./Accounts";
+import {
+  chooseModelDefaults,
+  modelSelectionReady,
+  type ModelOptions,
+  type ModelSelection,
+  type PublicProfile,
+} from "./modelDefaults";
+import { ThemeToggle } from "./ThemeToggle";
+import { applyTheme, resolveTheme } from "./theme";
+
+let savedTheme: string | null = null;
+try { savedTheme = localStorage.getItem("rag-theme"); } catch { /* use OS preference */ }
+applyTheme(resolveTheme(savedTheme, window.matchMedia("(prefers-color-scheme: dark)").matches));
 
 function App({ account }: { account: CurrentAccount }) {
   const [error, setError] = useState("");
@@ -20,6 +33,11 @@ function App({ account }: { account: CurrentAccount }) {
   const [project, setProject] = useState("");
   const [mode, setMode] = useState("live");
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
+  const [modelSelection, setModelSelection] = useState<ModelSelection>({});
+  const [modelOptions, setModelOptions] = useState<ModelOptions>({ generation: [], embedding: [] });
+  const [modelStatus, setModelStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [modelError, setModelError] = useState("");
+  const modelRequest = useRef(0);
   const [name, setName] = useState("");
   const [view, setView] = useState<"playground" | "sources" | "history" | "setup">(
     "playground",
@@ -41,6 +59,47 @@ function App({ account }: { account: CurrentAccount }) {
       .catch((e) => { if (active) setError(e.message); });
     return () => { active = false; };
   }, []);
+  const modelStorageKey = `rag-model-defaults:${account.user?.id || "local"}`;
+  async function refreshModels() {
+    const request = ++modelRequest.current;
+    setModelStatus("loading");
+    setModelError("");
+    setModelOptions({ generation: [], embedding: [] });
+    setModelSelection({});
+    try {
+      const options = account.deployment === "hosted"
+        ? await api<ModelOptions>("/me/openai-models")
+        : await api<{ items: PublicProfile[] }>("/system/profiles").then(({ items }) => ({
+            generation: items.filter((profile) => profile.operations.includes("generation")),
+            embedding: items.filter((profile) => profile.operations.includes("embedding")),
+          }));
+      if (request !== modelRequest.current) return;
+      if (!options.generation.length || !options.embedding.length)
+        throw new Error("No compatible generation and embedding model pair is available.");
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem(modelStorageKey) || "null"); } catch { /* use server defaults */ }
+      setModelOptions(options);
+      setModelSelection(chooseModelDefaults(options, saved));
+      setModelStatus("ready");
+    } catch (e) {
+      if (request !== modelRequest.current) return;
+      setModelError((e as Error).message);
+      setModelStatus("error");
+    }
+  }
+  useEffect(() => {
+    void refreshModels();
+    return () => { modelRequest.current++; };
+  }, [account.deployment, modelStorageKey]);
+  function updateModelSelection(selection: ModelSelection) {
+    setModelSelection(selection);
+    try {
+      localStorage.setItem(modelStorageKey, JSON.stringify({
+        generation: selection.generation?.id,
+        embedding: selection.embedding?.id,
+      }));
+    } catch { /* Browser storage is optional. */ }
+  }
   async function addProject(e: React.FormEvent) {
     e.preventDefault();
     const form = e.currentTarget as HTMLFormElement;
@@ -121,6 +180,7 @@ function App({ account }: { account: CurrentAccount }) {
             </Button>
           </form>
         </details>
+        <ThemeToggle />
       </aside>
       <main className="workspace">
         <header className="page-heading">
@@ -138,7 +198,7 @@ function App({ account }: { account: CurrentAccount }) {
           </div>
         )}
         {error && <ErrorNotice message={error} />}
-        {view === "setup" ? <Setup hosted={account.deployment === "hosted"} onKeyChanged={() => { void api<{ items: Capability[] }>("/system/capabilities").then(c => setCapabilities(c.items)); }} /> : !project ? (
+        {view === "setup" ? <Setup hosted={account.deployment === "hosted"} modelSelection={modelSelection} modelOptions={modelOptions} modelStatus={modelStatus} modelError={modelError} onModelSelection={updateModelSelection} onRefreshModels={refreshModels} onKeyChanged={() => { void api<{ items: Capability[] }>("/system/capabilities").then(c => setCapabilities(c.items)); }} /> : !project ? (
           <Empty title="Start with a project">
             <p>Keep a set of documents and comparisons together.</p>
             <form onSubmit={addProject} className="inline-form">
@@ -161,6 +221,8 @@ function App({ account }: { account: CurrentAccount }) {
             key={project}
             project={project}
             capabilities={capabilities}
+            modelSelection={modelSelection}
+            modelsReady={modelStatus === "ready" && modelSelectionReady(modelSelection)}
             view={view}
             onView={setView}
           />

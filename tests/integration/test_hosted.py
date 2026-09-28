@@ -41,6 +41,72 @@ def test_hosted_requires_authentication(hosted):
     assert hosted.get("/api/v1/health").status_code == 200
 
 
+def test_hosted_api_accepts_worker_only_techniques(hosted, account, monkeypatch):
+    import asyncio
+    from importlib.metadata import PackageNotFoundError
+    import rag_runtime.pageindex_adapter as pageindex_adapter
+    import rag_runtime.registry as registry
+    import rag_runtime.reranker as reranker
+    from app.models import IndexBundle, Source
+    from workers.main import Worker
+
+    monkeypatch.setattr(reranker, "unavailable_reason", lambda config: "worker image only")
+    monkeypatch.setattr(pageindex_adapter, "unavailable_reason", lambda: "worker image only")
+    installed_version = registry.version
+
+    def without_pageindex_metadata(name):
+        if name == "pageindex":
+            raise PackageNotFoundError(name)
+        return installed_version(name)
+
+    monkeypatch.setattr(registry, "version", without_pageindex_metadata)
+    hosted.app.state.profiles["fixture-answer"].operations.append("tree_indexing")
+
+    capabilities = hosted.get("/api/v1/system/capabilities").json()["items"]
+    by_technique = {item["technique"]: item for item in capabilities}
+    assert by_technique["hybrid_rerank"]["available"] is True
+    assert by_technique["pageindex"]["available"] is True
+
+    worker = Worker(hosted.app.state.settings)
+    try:
+        project = hosted.post("/api/v1/projects", json={"name": "Worker adapters"}).json()["id"]
+        source = hosted.post(
+            f"/api/v1/projects/{project}/sources/upload",
+            files={"file": ("clock.txt", b"A clock can drift.")},
+        ).json()
+        asyncio.run(worker.run_resource(source["id"]))
+        corpus = hosted.post(
+            f"/api/v1/projects/{project}/corpus-versions", json={"source_ids": [source["id"]]}
+        ).json()
+        saved = hosted.post(
+            f"/api/v1/projects/{project}/configurations",
+            json={"name": "Reranked", "config": by_technique["hybrid_rerank"]["default_config"]},
+        ).json()
+        prepared = hosted.post(
+            f"/api/v1/projects/{project}/preparations",
+            headers={"Idempotency-Key": str(uuid4())},
+            json={"config_id": saved["id"], "corpus_version_id": corpus["id"]},
+        )
+        assert prepared.status_code == 202, prepared.text
+        bundle = prepared.json()
+        with hosted.app.state.store.session() as session:
+            ready = session.get(IndexBundle, bundle["id"])
+            ready.status = "ready"
+            ready.artifact_ids = [session.get(Source, source["id"]).parsed_artifact_id]
+        run = hosted.post(
+            f"/api/v1/projects/{project}/runs",
+            headers={"Idempotency-Key": str(uuid4())},
+            json={
+                "corpus_version_id": corpus["id"],
+                "question": "What can happen to a clock?",
+                "lanes": [{"config_id": saved["id"], "bundle_id": bundle["id"]}],
+            },
+        )
+        assert run.status_code == 202, run.text
+    finally:
+        worker.close()
+
+
 def test_accounts_csrf_ownership_logout_and_recovery(hosted, monkeypatch):
     # Production validates Turnstile with its provider; only that external boundary is replaced.
     import app.auth as auth
@@ -117,6 +183,85 @@ def test_keys_are_encrypted_isolated_and_do_not_change_fingerprints(hosted, acco
     other = signup(hosted)
     with hosted.app.state.store.session() as s:
         assert user_profiles(hosted.app.state.settings, {"answer": profile}, s.get(User, other["user"]["id"]))["answer"].key == ""
+
+
+def test_model_discovery_returns_only_newest_compatible_profiles(hosted, account, monkeypatch):
+    import httpx
+    import app.auth as auth
+    from rag_runtime.providers import Profile
+
+    profiles = [
+        Profile(
+            id=f"generation-{index}",
+            label=f"Generation {index}",
+            model=f"gpt-compatible-{index}",
+            operations=["generation", "tree_selection", "tree_indexing"],
+            max_output_tokens=4096,
+            tokenizer="cl100k_base",
+        )
+        for index in range(12)
+    ] + [
+        Profile(
+            id="embedding-large",
+            label="Embedding large",
+            model="embedding-compatible-large",
+            operations=["embedding"],
+            dimensions=3072,
+            tokenizer="cl100k_base",
+        ),
+        Profile(
+            id="embedding-small",
+            label="Embedding small",
+            model="embedding-compatible-small",
+            operations=["embedding"],
+            dimensions=1536,
+            tokenizer="cl100k_base",
+        ),
+        Profile(
+            id="configured-but-unavailable",
+            label="Not listed for this key",
+            model="missing-from-model-list",
+            operations=["generation"],
+            max_output_tokens=4096,
+            tokenizer="cl100k_base",
+        ),
+    ]
+    hosted.app.state.profiles = {profile.id: profile.with_key("") for profile in profiles}
+    key = "sk-owner-model-discovery"
+    hosted.put("/api/v1/me/openai-key", json={"api_key": key}).raise_for_status()
+    captured = {}
+
+    class Client:
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): return None
+        async def get(self, url, headers):
+            captured.update(url=url, authorization=headers["Authorization"])
+            data = [
+                {"id": f"gpt-compatible-{index}", "object": "model", "created": index, "owned_by": "openai"}
+                for index in range(12)
+            ] + [
+                {"id": "embedding-compatible-small", "object": "model", "created": 100, "owned_by": "openai"},
+                {"id": "embedding-compatible-large", "object": "model", "created": 101, "owned_by": "openai"},
+                {"id": "not-configured", "object": "model", "created": 999, "owned_by": "openai"},
+            ]
+            request = httpx.Request("GET", url)
+            return httpx.Response(200, json={"object": "list", "data": data}, request=request)
+
+    monkeypatch.setattr(auth.httpx, "AsyncClient", lambda **kwargs: Client())
+    response = hosted.get("/api/v1/me/openai-models")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert [profile["id"] for profile in body["generation"]] == [
+        f"generation-{index}" for index in range(11, 1, -1)
+    ]
+    assert [profile["id"] for profile in body["embedding"]] == [
+        "embedding-large", "embedding-small"
+    ]
+    assert captured == {
+        "url": "https://api.openai.com/v1/models",
+        "authorization": f"Bearer {key}",
+    }
+    assert key not in response.text and "not-configured" not in response.text
 
 
 def test_every_saved_resource_is_private(hosted, account):

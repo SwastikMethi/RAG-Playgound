@@ -24,6 +24,48 @@ import rag_runtime.runtime as runtime
 LIMIT = 150 * 1024 * 1024
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = Path(runtime.__file__).parent
+RUNTIME_CORE = {
+    "__init__.py",
+    "chunking.py",
+    "context.py",
+    "contracts.py",
+    "errors.py",
+    "network.py",
+    "portable.py",
+    "preparation.py",
+    "process.py",
+    "providers.py",
+    "registry.py",
+    "retrieval.py",
+    "runtime.py",
+    "trace.py",
+    "vectors.py",
+}
+
+
+def runtime_module_names(config, sources):
+    names = set(RUNTIME_CORE)
+    formats = {source.get("source_format") for source in sources}
+    if formats - {"postgres_snapshot"}:
+        names.add("parsing.py")
+    if "postgres_snapshot" in formats:
+        names.add("postgres_source.py")
+    if config.get("reranker") is not None:
+        names.add("reranker.py")
+    if config.get("tree") is not None:
+        names.update({"pageindex_adapter.py", "pageindex_build.py"})
+    return sorted(names)
+
+
+def selected_extras(config, sources):
+    extras = []
+    if any(source.get("source_format") == "pdf" for source in sources):
+        extras.append("pdf")
+    if config.get("reranker") is not None:
+        extras.append("rerank")
+    if config.get("tree") is not None:
+        extras.append("tree")
+    return extras
 
 
 def portable_configuration(config, profiles):
@@ -52,9 +94,12 @@ def write_package(folder, config, profiles, sources, manifest, data):
     import yaml
 
     files = {}
-    for path in sorted(RUNTIME.glob("*.py")):
+    for name in [*runtime_module_names(config, sources), "export_replay.py"]:
+        path = RUNTIME / name
         if path.is_symlink():
             raise Problem("UNSAFE_PACKAGE", "Runtime sources cannot be symlinks.")
+        if not path.is_file():
+            raise Problem("UNSAFE_PACKAGE", "A required runtime source is unavailable.")
         files["src/rag_runtime/" + path.name] = path.read_bytes()
     for filename in (
         "pipeline.schema.json",
@@ -95,7 +140,9 @@ sys.path.insert(0, str(ROOT / 'src'))
 from rag_runtime.portable import main
 main({command!r}, ROOT)
 """
-    files["scripts/prepare_models.py"] = (ROOT / "tools/prepare_models.py").read_bytes()
+    extras = selected_extras(config, sources)
+    if {"pdf", "rerank"}.intersection(extras):
+        files["scripts/prepare_models.py"] = (ROOT / "tools/prepare_models.py").read_bytes()
     files["app/main.py"] = """from pathlib import Path
 import sys
 ROOT = Path(__file__).resolve().parents[1]
@@ -110,11 +157,12 @@ class PackageTest(unittest.TestCase):
     def test_package(self):
         self.assertEqual(static_check(Path(__file__).resolve().parents[1])["status"], "passed")
 """
-    files["Dockerfile"] = """FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    sync_command = "uv sync --frozen --no-dev" + "".join(f" --extra {extra}" for extra in extras)
+    files["Dockerfile"] = f"""FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends libglib2.0-0 libgl1 libgomp1 && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY . .
-RUN uv sync --frozen --all-extras --no-dev
+RUN {sync_command}
 EXPOSE 8000
 CMD ["uv", "run", "--no-sync", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
 """
@@ -152,22 +200,25 @@ CMD ["uv", "run", "--no-sync", "uvicorn", "app.main:app", "--host", "0.0.0.0", "
         notice.append(f"| {d.metadata['Name']} | {d.version} | {license} |")
     files["THIRD_PARTY_NOTICES.md"] = "\n".join(notice) + "\n"
     fixture = any(p["kind"] == "fixture" for p in profiles)
+    prepare_commands = "\n".join(
+        [
+            *( ["# Download public PDF parser assets:", "uv run --no-sync python scripts/prepare_models.py --pdf"] if "pdf" in extras else [] ),
+            *( ["# Download the pinned local cross-encoder:", "uv run --no-sync python scripts/prepare_models.py --reranker"] if "rerank" in extras else [] ),
+        ]
+    )
     files["README.md"] = f"""# Exported RAG application
 
 {"**Fixture demonstration: answer and embedding outputs are synthetic. This is not a live model result.**" if fixture else "This application uses your configured model providers. Keys are required for ingestion with embeddings/tree indexing and for queries."}
 
-Technique: `{config["technique"]}`. The archive contains the same retrieval, preparation, context and generation runtime as the playground. It requires Python 3.12 and uv. Dependencies are locked; the full optional dependency set is retained for reproducible PDF/tree/reranker setup.
+Technique: `{config["technique"]}`. The archive contains the same retrieval, preparation, context and generation runtime as the playground. It requires Python 3.12 and uv. Dependencies are locked; only optional groups required by this pipeline are installed.
 
 ## Setup and query
 
 ```sh
-uv sync --frozen --all-extras --no-dev
+{sync_command}
 cp .env.example .env
 # Fill the provider key variables and RAG_QUERY_TOKEN in .env.
-# For PDF input, download the public parser assets:
-uv run --no-sync python scripts/prepare_models.py --pdf
-# For hybrid_rerank, also download the pinned local cross-encoder:
-uv run --no-sync python scripts/prepare_models.py --reranker
+{prepare_commands}
 # For vector techniques, start Qdrant:
 {"docker compose up -d qdrant" if config["embedding"] else "# No Qdrant service is needed for this technique."}
 # Put exact original source bytes in data/ under the aliases in source-manifest.json.
@@ -270,7 +321,9 @@ async def export_lane(worker, claim):
             corpus_fingerprint=corpus.content_fingerprint,
             runtime_revision=__version__
             + "+"
-            + digest(b"".join(p.read_bytes() for p in sorted(RUNTIME.glob("*.py"))))[:16],
+            + digest(
+                b"".join((RUNTIME / name).read_bytes() for name in runtime_module_names(config, entries))
+            )[:16],
             dependency_lock_sha256=digest((ROOT / "uv.lock").read_bytes()),
             prompt_id="grounded_answer_v1",
             prompt_sha256=digest(GROUNDING.encode()),
@@ -351,6 +404,7 @@ async def export_lane(worker, claim):
             details="Manifest/pipeline schema, Python syntax/imports, declared locked dependencies and safe archive paths checked.",
             recorded_boundaries=[],
         )
+        files.pop("src/rag_runtime/export_replay.py", None)
         validate(manifest, "export-manifest.schema.json")
         (folder / "manifest.json").write_bytes(canonical(manifest))
         output = io.BytesIO()

@@ -4364,6 +4364,61 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
       security:
       - CookieSession: []
+  /me/openai-models:
+    get:
+      operationId: getMeOpenaiModels
+      summary: List compatible OpenAI models available to the saved account key
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenAIModelOptions'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Cross-origin request denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Accounts are unavailable in local mode
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Missing or rejected provider credential
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request exceeds configured limits
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Provider discovery unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - CookieSession: []
   /me/openai-key:
     get:
       operationId: getMeOpenaiKey
@@ -6112,6 +6167,23 @@ components:
           type: boolean
       required:
       - configured
+    OpenAIModelOptions:
+      type: object
+      additionalProperties: false
+      properties:
+        generation:
+          type: array
+          items:
+            $ref: '#/components/schemas/Profile'
+          maxItems: 10
+        embedding:
+          type: array
+          items:
+            $ref: '#/components/schemas/Profile'
+          maxItems: 10
+      required:
+      - generation
+      - embedding
     AccountSession:
       type: object
       additionalProperties: false

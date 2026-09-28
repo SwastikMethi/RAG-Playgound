@@ -103,7 +103,11 @@ def create_run(project_id: str, body: dict, request: Request, idempotency_key: s
         for selected in body["lanes"]:
             config = scoped(s, Configuration, selected["config_id"], project_id)
             bundle = scoped(s, IndexBundle, selected["bundle_id"], project_id)
-            check_config(config.config, profiles)
+            check_config(
+                config.config,
+                profiles,
+                require_local_adapters=request.app.state.settings.deployment != "hosted",
+            )
             if (
                 bundle.status != "ready"
                 or bundle.corpus_version_id != corpus.id

@@ -34,7 +34,7 @@ async def test_actual_pageindex_sdk_builds_and_maps_pdf_through_bounded_model_ga
 
     class SummaryBoundary:
         async def complete(self, profile, messages, **kwargs):
-            calls.append(messages)
+            calls.append(kwargs["max_tokens"])
             return dict(
                 text="A guide to fixing NEBULA-42 clock drift by synchronizing the system clock.",
                 usage=empty_usage(),
@@ -47,13 +47,13 @@ async def test_actual_pageindex_sdk_builds_and_maps_pdf_through_bounded_model_ga
         label="Synthetic summary boundary",
         model="fixture",
         operations=["tree_indexing"],
-        max_output_tokens=512,
+        max_output_tokens=128000,
         tokenizer="cl100k_base",
     )
     path, src = pdf_fixture(tmp_path)
     doc = await asyncio.wait_for(build_document(path, src, profile, SummaryBoundary(), root=tmp_path), 60)
     assert doc["nodes"] and doc["nodes"][0]["page_start"] == 1
-    assert len(doc["page_hashes"]) == 1 and calls
+    assert len(doc["page_hashes"]) == 1 and calls and set(calls) == {4096}
     assert doc["source"]["text"] == src["text"]
     assert not list(tmp_path.glob("job-*"))
 

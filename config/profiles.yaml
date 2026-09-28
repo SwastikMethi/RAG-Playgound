@@ -1,6 +1,51 @@
 # Owner-managed OpenAI profiles. Credentials are read from the server environment.
 # Application limits below are deliberately lower than the answer model's maximum capacity.
 profiles:
+  - id: openai-answer-luna
+    label: OpenAI · GPT-6 Luna
+    kind: openai
+    model: gpt-6-luna
+    operations: [generation, tree_selection, tree_indexing]
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    max_input_tokens: 1050000
+    max_output_tokens: 128000
+    tokenizer: o200k_base
+    supports_temperature: true
+    supports_seed: true
+    completion_token_parameter: max_completion_tokens
+    reasoning_effort: none
+    revision: "2025-04-14"
+  - id: openai-answer-sol
+    label: OpenAI · GPT-6 Sol
+    kind: openai
+    model: gpt-6-sol
+    operations: [generation, tree_selection, tree_indexing]
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    max_input_tokens: 1050000
+    max_output_tokens: 128000
+    tokenizer: o200k_base
+    supports_temperature: true
+    supports_seed: false
+    completion_token_parameter: max_completion_tokens
+    reasoning_effort: none
+    revision: "1"
+  - id: openai-answer-astra
+    label: OpenAI · GPT-6 Astra
+    kind: openai
+    model: gpt-6-astra
+    operations: [generation, tree_selection, tree_indexing]
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    max_input_tokens: 1050000
+    max_output_tokens: 128000
+    tokenizer: o200k_base
+    supports_temperature: false
+    supports_seed: false
+    completion_token_parameter: max_completion_tokens
+    reasoning_effort: low
+    revision: "1"
   - id: openai-answer
     label: OpenAI · GPT-4.1 mini
     kind: openai
@@ -14,6 +59,17 @@ profiles:
     supports_temperature: true
     supports_seed: false
     revision: "2025-04-14"
+  - id: openai-embedding-large
+    label: OpenAI · Text embedding 3 large
+    kind: openai
+    model: text-embedding-3-large
+    operations: [embedding]
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    max_input_tokens: 8191
+    dimensions: 3072
+    tokenizer: cl100k_base
+    revision: "1"
   - id: openai-embedding
     label: OpenAI · Text embedding 3 small
     kind: openai

@@ -3,6 +3,7 @@ import { FlaskConical } from "lucide-react";
 import { api, post, setCSRF } from "./api";
 import type { components } from "./generated/api";
 import { Button, ErrorNotice } from "./ui";
+import { ThemeToggle } from "./ThemeToggle";
 
 export type CurrentAccount = components["schemas"]["CurrentAccount"];
 type Recovery = components["schemas"]["AccountRecovery"];
@@ -76,7 +77,7 @@ function AuthScreen({ account }: { account: CurrentAccount }) {
     finally { setBusy(false); }
   }
   return <main className="auth-shell">
-    <a href="/" className="auth-brand"><FlaskConical size={24} /> RAG Playground</a>
+    <div className="auth-top"><a href="/" className="auth-brand"><FlaskConical size={24} /> RAG Playground</a><ThemeToggle /></div>
     <section className="auth-card">
       {recovery ? <>
         <span className="caption">ACCOUNT RECOVERY</span>

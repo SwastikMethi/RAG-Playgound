@@ -56,7 +56,7 @@ async def build_document(path, source, profile, gateway, root=None):
                 ):
                     raise Problem("SDK_TRANSPORT", "The SDK returned unsupported model input.")
                 reply = await gateway.complete(
-                    profile, messages, max_tokens=profile.max_output_tokens or 4096, retries=1
+                    profile, messages, max_tokens=min(profile.max_output_tokens or 4096, 4096), retries=1
                 )
                 records.append(dict(reply["recording"], operation="tree_indexing"))
                 body = dict(

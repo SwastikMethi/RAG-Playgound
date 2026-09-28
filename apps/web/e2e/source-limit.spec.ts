@@ -18,7 +18,7 @@ test("multi-file uploads explain the corpus limit and allow 50 sources", async (
     mimeType: "text/plain",
     buffer: Buffer.from(`Document ${i + 1}: NEBULA-42 means clock drift.`),
   })));
-  await expect(page.locator(".source-footer")).toContainText("51 / 50 selected", { timeout: 20000 });
+  await expect(page.locator(".source-footer")).toContainText(/51 \/ 50 selected · .+ \/ 100 MiB/, { timeout: 20000 });
   await expect(page.getByRole("alert")).toContainText("Select at most 50 sources per corpus. Deselect 1 source to continue.");
   await expect(page.getByRole("button", { name: "Use selected sources" })).toBeDisabled();
   expect(submittedCorpora).toBe(0);

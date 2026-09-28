@@ -5,7 +5,6 @@ from .contracts import digest
 from .errors import Problem
 from .providers import Profile, Gateway, empty_usage
 from .runtime import execute
-from .reranker import request_hash
 from .vectors import Scope, VectorStore
 
 
@@ -47,6 +46,8 @@ class RecordedGateway:
         yield dict(usage=record["usage"])
 
     async def rerank(self, question, candidates, config):
+        from .reranker import request_hash
+
         if not candidates:
             return dict(candidates=[], wait_ms=0, recording=None)
         record = self.take("reranking", "request_sha256", request_hash(question, candidates, config))

@@ -1,10 +1,35 @@
 import json
+from pathlib import Path
 
 import httpx
 import pytest
 
 from rag_runtime.errors import Problem
 from rag_runtime.providers import Profile
+
+
+def test_owner_profile_ids_keep_preexisting_saved_configurations_valid():
+    from app.settings import Settings
+    from rag_runtime.providers import load_profiles
+    from rag_runtime.registry import check_config, defaults
+
+    profiles = load_profiles(
+        Settings(
+            mode="live",
+            profiles_path=Path(__file__).parents[2] / "config/profiles.yaml",
+            _env_file=None,
+        )
+    )
+    config = defaults("dense", profiles)
+    assert config is not None
+    config["generation"].update(
+        profile_id="openai-answer", model="gpt-4.1-mini-2025-04-14"
+    )
+    config["embedding"].update(
+        profile_id="openai-embedding", model="text-embedding-3-small", dimensions=1536
+    )
+
+    check_config(config, profiles, require_available=False, require_local_adapters=False)
 
 
 @pytest.mark.asyncio

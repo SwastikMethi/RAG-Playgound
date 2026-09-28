@@ -251,6 +251,55 @@ def key_status(request: Request):
         return {"configured": bool(s.get(User, request.state.user["id"]).encrypted_openai_key)}
 
 
+@router.get("/me/openai-models")
+async def openai_models(request: Request):
+    require_hosted(request)
+    profiles = [profile for profile in request.state.profiles.values() if profile.kind == "openai"]
+    key = next((profile.key for profile in profiles if profile.key), "")
+    if not key:
+        raise Problem("MISSING_CREDENTIALS", "Save an OpenAI key before choosing models.", 409)
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(10, connect=5), trust_env=False, follow_redirects=False
+        ) as client:
+            response = await client.get(
+                "https://api.openai.com/v1/models", headers={"Authorization": f"Bearer {key}"}
+            )
+            response.raise_for_status()
+        if len(response.content) > 1_000_000:
+            raise ValueError("model response too large")
+        data = response.json()
+        items = data.get("data") if isinstance(data, dict) else None
+        if not isinstance(items, list):
+            raise ValueError("invalid model response")
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code in {401, 403}:
+            raise Problem(
+                "INVALID_PROVIDER_CREDENTIAL", "OpenAI rejected the saved key. Replace it and retry.", 409
+            ) from None
+        raise Problem("PROVIDER_UNAVAILABLE", "OpenAI model discovery is unavailable. Retry shortly.", 503) from None
+    except (httpx.HTTPError, ValueError):
+        raise Problem("PROVIDER_UNAVAILABLE", "OpenAI model discovery is unavailable. Retry shortly.", 503) from None
+
+    created = {
+        item["id"]: item["created"]
+        for item in items
+        if isinstance(item, dict)
+        and isinstance(item.get("id"), str)
+        and 0 < len(item["id"]) <= 300
+        and type(item.get("created")) is int
+    }
+
+    def select(operation):
+        compatible = [
+            profile for profile in profiles if operation in profile.operations and profile.model in created
+        ]
+        compatible.sort(key=lambda profile: (-created[profile.model], profile.id))
+        return [profile.public() for profile in compatible[:10]]
+
+    return {"generation": select("generation"), "embedding": select("embedding")}
+
+
 @router.put("/me/openai-key", status_code=204)
 def save_key(body: dict, request: Request):
     require_hosted(request)
