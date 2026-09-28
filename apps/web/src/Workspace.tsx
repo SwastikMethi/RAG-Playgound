@@ -629,6 +629,7 @@ export function Workspace({
                 {history.map((item) => (
                   <button
                     key={item.id}
+                    disabled={busy}
                     onClick={() => {
                       openRun(item);
                       onView("playground");

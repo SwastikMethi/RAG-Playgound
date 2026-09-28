@@ -120,6 +120,9 @@ class RunWriter:
                 return
             try:
                 self.flush(lane_id)
+            except asyncio.CancelledError:
+                if not closing:
+                    raise
             except Problem as exc:
                 if not (closing and exc.code == "TRACE_LIMIT"):
                     raise

@@ -161,6 +161,47 @@ async def test_partial_answer_cancellation_closes_spans_and_stops_output(client,
         assert events[-1].type == "run.cancelled"
 
 
+@pytest.mark.asyncio
+async def test_cancellation_discards_buffered_delta_and_persists_closing_event(client, prepared):
+    from app.models import Lane
+    from rag_runtime.providers import empty_usage
+    from rag_runtime.trace import empty_timing
+    from workers.events import RunWriter
+
+    worker, create = prepared
+    run = create()
+    lane_id = run["lanes"][0]["id"]
+    with worker.store.session() as s:
+        job = s.scalar(select(Job).where(Job.resource_id == run["id"]))
+    claim = worker.store.claim(job.id)
+    writer = RunWriter(worker.store, claim)
+
+    await writer.emit(None, "run.started", dict(lane_ids=[lane_id], queue_ms=1))
+    await writer.emit(
+        lane_id,
+        "lane.started",
+        dict(
+            technique="bm25",
+            config_id=run["lanes"][0]["config_id"],
+            bundle_id=run["lanes"][0]["bundle_id"],
+        ),
+    )
+    await writer.emit(lane_id, "answer.delta", dict(text="saved", offset_chars=0))
+    await writer.emit(lane_id, "answer.delta", dict(text=" buffered", offset_chars=5))
+    with worker.store.session() as s:
+        s.get(Lane, lane_id).cancel_requested_at = worker.store.now(s)
+
+    await writer.emit(
+        lane_id,
+        "lane.cancelled",
+        dict(reason="Cancelled by owner.", metrics=empty_timing(), usage=empty_usage()),
+    )
+
+    saved = client.get("/api/v1/runs/" + run["id"]).json()["lanes"][0]
+    assert saved["status"] == "cancelled"
+    assert saved["answer"] == "saved"
+
+
 def test_worker_loss_fences_old_writer_and_terminates_unfinished_spans(client, prepared):
     from workers.events import RunWriter
 
