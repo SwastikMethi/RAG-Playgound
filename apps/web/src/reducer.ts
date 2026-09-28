@@ -29,13 +29,14 @@ export type Playback = {
   runId: string;
   lastSeq: number;
   status: string;
+  queueMs: number | null;
   lanes: Record<string, LaneState>;
   resync: boolean;
 };
 export const terminal = (status: string) =>
   ["completed", "partial", "failed", "cancelled", "timed_out"].includes(status);
 export function emptyState(runId: string): Playback {
-  return { runId, lastSeq: 0, status: "queued", lanes: {}, resync: false };
+  return { runId, lastSeq: 0, status: "queued", queueMs: null, lanes: {}, resync: false };
 }
 const emptyLane = (): LaneState => ({
   status: "queued",
@@ -66,6 +67,7 @@ export async function reduceEvent(
   };
   if (event.type === "run.started") {
     next.status = "running";
+    next.queueMs = typeof p.queue_ms === "number" ? p.queue_ms : null;
     for (const id of p.lane_ids as string[]) next.lanes[id] ??= emptyLane();
   } else if (event.type.startsWith("run.")) next.status = String(p.status);
   if (event.lane_id) {

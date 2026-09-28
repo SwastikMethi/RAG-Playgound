@@ -28,6 +28,7 @@ describe("the live and replay reducer", () => {
       event(4, "answer.delta", { offset_chars: 2, text: "B" }),
     ];
     for (const frame of frames) state = await reduceEvent(state, frame);
+    expect(state.queueMs).toBe(5);
     expect(state.lanes.lane.answer).toBe("A🪐B");
     expect(await reduceEvent(state, frames[2])).toBe(state);
     expect(

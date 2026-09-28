@@ -48,6 +48,11 @@ test("upload, prepare, answer, inspect evidence and replay", async ({
   await page.getByRole("button", { name: "Prepare selected" }).click();
   await expect(page.locator(".setup-bar .button").last()).toHaveAttribute("aria-busy", "true");
   await expect(page.locator(".setup-bar .button").last()).toBeDisabled();
+  await expect(
+    page.getByText("Starting the on-demand worker or waiting for earlier work", {
+      exact: false,
+    }),
+  ).toBeVisible({ timeout: 20000 });
   await expect(page.getByText("Ready to compare", { exact: true })).toBeVisible(
     { timeout: 20000 },
   );
@@ -58,7 +63,16 @@ test("upload, prepare, answer, inspect evidence and replay", async ({
   await page
     .getByLabel("Question for all selected lanes")
     .fill("What does NEBULA-42 mean?");
+  await page.route(/\/api\/v1\/runs\/[^/]+\/events\?/, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    await route.continue();
+  }, { times: 1 });
   await page.getByRole("button", { name: "Ask all lanes" }).click();
+  await expect(
+    page.getByText("Starting the on-demand worker or waiting for earlier work", {
+      exact: false,
+    }),
+  ).toBeVisible();
   await expect(page.locator(".answer-text")).toContainText(
     "Synchronize the clock",
     { timeout: 20000 },
@@ -66,6 +80,7 @@ test("upload, prepare, answer, inspect evidence and replay", async ({
   await expect(
     page.getByText("Saved comparison", { exact: false }),
   ).toBeVisible();
+  await expect(page.locator(".comparison-heading .caption")).not.toContainText("Queue —");
   await expect(page.locator(".question-box .caption")).toHaveText("fixture-answer-v1");
   await expect(page.locator(".question-box .caption")).not.toContainText("context tokens");
   await expect(page.locator(".answer-text script, .answer-text img, .answer-text a")).toHaveCount(0);

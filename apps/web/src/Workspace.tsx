@@ -33,7 +33,7 @@ import {
   type Run,
   type Source,
 } from "./api";
-import { Button, Empty, ErrorNotice, Inspector, Loading, Status } from "./ui";
+import { BackgroundWork, Button, Empty, ErrorNotice, Inspector, Loading, Status } from "./ui";
 import {
   emptyState,
   reduceEvent,
@@ -466,6 +466,13 @@ export function Workspace({
         bundles[c.id]?.status === "ready",
     );
   const active = !!run && !terminal(run.status);
+  const preparationStatus = selectedConfigs.some(
+    (config) => bundles[config.id]?.status === "preparing",
+  )
+    ? "preparing"
+    : selectedConfigs.some((config) => bundles[config.id]?.status === "queued")
+      ? "queued"
+      : null;
   const stageBoundaries = events
     .filter(
       (e) =>
@@ -692,6 +699,7 @@ export function Workspace({
                 )}
               </Button>
             </section>
+            {preparationStatus && <BackgroundWork status={preparationStatus} />}
             <details
               className="technique-picker"
               open={!selectedConfigs.length}
@@ -813,16 +821,20 @@ export function Workspace({
                 <div className="comparison-heading">
                   <div>
                     <h2>{run.question}</h2>
-                    <span className="caption">
-                      {replaying
-                        ? "Replay of saved execution"
-                        : connected
-                          ? "Receiving saved events"
-                          : terminal(playback?.status || "")
-                            ? "Saved comparison"
-                            : disconnected ? "Connection interrupted" : "Reconnecting…"}{" "}
-                      · Queue {ms(run.queue_ms)} · Timings describe this run
-                    </span>
+                    {run.status === "queued" && playback?.status === "queued" ? (
+                      <BackgroundWork status="queued" />
+                    ) : (
+                      <span className="caption">
+                        {replaying
+                          ? "Replay of saved execution"
+                          : connected
+                            ? "Receiving saved events"
+                            : terminal(playback?.status || "")
+                              ? "Saved comparison"
+                              : disconnected ? "Connection interrupted" : "Reconnecting…"}{" "}
+                        · Queue {ms(playback?.queueMs ?? run.queue_ms)} · Timings describe this run
+                      </span>
+                    )}
                   </div>
                   <Status value={playback?.status || run.status} />
                   {disconnected && <Button onClick={() => { setError(""); setConnectionAttempt((n) => n + 1); }}>Reconnect to saved events</Button>}

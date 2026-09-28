@@ -31,6 +31,18 @@ export function Button({
 export function Loading({ label = "Loading" }: { label?: string }) {
   return <span className="loading-indicator" role="status" aria-label={label} />;
 }
+export function BackgroundWork({ status }: { status: "queued" | "preparing" }) {
+  const message =
+    status === "queued"
+      ? "Starting the on-demand worker or waiting for earlier work. This may take about a minute after inactivity."
+      : "Preparing selected pipelines…";
+  return (
+    <span className="background-work caption">
+      <Loading label={message} />
+      {message}
+    </span>
+  );
+}
 export function Status({ value }: { value: string }) {
   const active = ["queued", "processing", "preparing", "running", "building"].includes(value);
   return (

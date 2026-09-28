@@ -383,6 +383,12 @@ form {
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
+
+.background-work {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
